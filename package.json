@@ -1,0 +1,23 @@
+{
+  "name": "tovia",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @tovia/web",
+    "build": "npm run build --workspace @tovia/web",
+    "lint": "npm run lint --workspace @tovia/web",
+    "typecheck": "npm run typecheck --workspace @tovia/web",
+    "test:web": "npm run test --workspace @tovia/web",
+    "format": "prettier --write \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/web/*.{ts,mjs,json}\" \"apps/web/tests/**/*.ts\"",
+    "format:check": "prettier --check \"apps/web/src/**/*.{ts,tsx,css}\" \"apps/web/*.{ts,mjs,json}\" \"apps/web/tests/**/*.ts\""
+  },
+  "devDependencies": {
+    "prettier": "^3.9.6"
+  }
+}

@@ -1,0 +1,51 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env: { POSTGRES_USER: tovia, POSTGRES_PASSWORD: test, POSTGRES_DB: tovia_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tovia -d tovia_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://tovia:test@localhost:5432/tovia_test
+      TEST_DATABASE_URL: postgresql+psycopg://tovia:test@localhost:5432/tovia_test
+      MIGRATION_TEST_DATABASE_URL: postgresql+psycopg://tovia:test@localhost:5432/tovia_migration
+      APP_ENV: test
+      AUTH_MODE: disabled
+    defaults:
+      run: { working-directory: apps/api }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: { version: "0.12.13", python-version: "3.12" }
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy app
+      - run: uv run alembic upgrade head
+      - run: uv run alembic check
+      - run: uv run python -c "import psycopg; c=psycopg.connect('postgresql://tovia:test@localhost:5432/tovia_test', autocommit=True); c.execute('CREATE DATABASE tovia_migration'); c.close()"
+      - run: uv run pytest
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "24", cache: npm }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:web
+      - run: docker compose config --quiet
+      - run: docker compose up --build --wait --wait-timeout 180
+      - run: curl --fail http://localhost:8000/health && curl --fail http://localhost:3000
+      - if: always()
+        run: docker compose logs && docker compose down

@@ -1,0 +1,9 @@
+**/node_modules/
+**/.next/
+**/next-env.d.ts
+**/dist/
+**/coverage/
+**/test-results/
+**/playwright-report/
+.cache/
+apps/api/.venv/

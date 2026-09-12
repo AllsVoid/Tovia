@@ -1,0 +1,119 @@
+# JavaScript dependencies and package-manager caches
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.pnp.*
+
+# Next.js, builds and task caches (all workspace packages)
+.next/
+next-env.d.ts
+out/
+dist/
+build/
+.turbo/
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+*.tsbuildinfo
+
+# Python environments, packaging and analysis
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pytype/
+.pyre/
+.tox/
+.nox/
+.hypothesis/
+
+# Tests, coverage and browser artifacts
+coverage/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit.xml
+playwright-report/
+playwright/.cache/
+test-results/
+blob-report/
+
+# Local configuration and credentials; sanitized examples remain trackable
+.env
+.env.*
+!.env.example
+!.env.*.example
+.envrc
+*.pem
+*.key
+
+# Logs, runtime state and local scratch files
+*.log
+*.pid
+*.pid.lock
+logs/
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+celerybeat-schedule*
+celerybeat.pid
+
+# Local infrastructure data and uploads (keep fixtures and migrations trackable)
+/infra/data/
+/infra/backups/
+/infra/volumes/
+/storage/
+/uploads/
+/apps/api/storage/
+/apps/api/uploads/
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.sqlite3-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Hosting and infrastructure tooling
+.vercel/
+.netlify/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
+
+# Editor and operating-system files
+.idea/
+**/.vscode/*
+!**/.vscode/extensions.json
+!**/.vscode/settings.json
+!**/.vscode/tasks.json
+!**/.vscode/launch.json
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Commit dependency lockfiles, Alembic migrations, fixtures, shared tool settings,
+# and project agent instructions; do not add blanket ignores for these files.
+docs/
