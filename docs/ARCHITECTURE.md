@@ -22,11 +22,13 @@ MapLibre 6 的 ESM worker 使用显式同源 URL。`predev` / `prebuild` 从锁�
 
 ### 底图来源与许可
 
-2026-09-13 从 Natural Earth 官方仓库取得 GeoJSON，裁剪无关属性，省界文件筛选 China 及 HK/MO/TW 对应记录；保留原始几何。低分辨率数据不保证小岛和全部行政细节，不能用作导航。运行时无需请求外部地图服务。
+2026-09-13 从 Natural Earth 官方仓库取得同为 1:50m 的 GeoJSON，裁剪无关属性。国家填色与描边共用国家几何；省界只保留 China 的 31 个省级面之间共享的内部边，避免省级外轮廓与国家海岸线重复。低分辨率数据不保证小岛和全部行政细节，不能用作导航。运行时无需请求外部地图服务。
 
-- [国家轮廓 ne_110m_admin_0_countries](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson)：177 features，`countries.geojson` SHA256 `226c1259c315eded4e607fcc553b90dc50a3c3b447ef41d57071c2700673bc79`。
-- [省界 ne_50m_admin_1_states_provinces](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_1_states_provinces.geojson)：筛选后 31 features，`provinces.geojson` SHA256 `3f731da60d2fef6fb7d4acf5c2cede1de37bef69c19f7e8f70bcf27ae6cbc143`。
+- [国家轮廓 ne_50m_admin_0_countries](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_0_countries.geojson)：242 features，`countries.geojson` SHA256 `3ebb06af22f73c54462e173c384bbb924cedf4c588b9df2cfee731dc31fdea00`。
+- [省界 ne_50m_admin_1_states_provinces](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_1_states_provinces.geojson)：31 个省级面提取为 72 条内部边界，`provinces.geojson` SHA256 `9ff4cb803c96bd28ce647f8dbaf3378cb53251628996b442b346e20aec588b5f`。
 - [Natural Earth 使用条款](https://www.naturalearthdata.com/about/terms-of-use/)：数据为 public domain；地图保留来源署名。
+
+下载上述两个原始 GeoJSON 后，可运行 `node apps/web/scripts/build-map-data.mjs <admin0-50m.json> <admin1-50m.json>` 重建内置地图。该脚本按不同省份共享的边提取内部边界，不将省级海岸线叠加到国家轮廓上。
 
 ## 1. 架构目标
 

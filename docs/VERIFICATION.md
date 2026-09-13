@@ -2,6 +2,8 @@
 
 ## Phase 2 验证（2026-09-13）
 
+界面修正：国家填色/轮廓统一为 50m，省界改为共享内部边；沿海地图截图检查通过。月历上限宽度改为 680px、日期格高度 76px（手机 68px），日期文字居中。浏览器测量确认空日期格两轴居中，390px 手机无横向溢出；ESLint、TypeScript 与两项 Playwright 交互测试通过。该修正没有数据库迁移。
+
 - API Ruff / format / MyPy strict 通过；pytest **15 passed，无跳过**。在仓库 `.cache` 内启动临时 PostgreSQL 17.11 + PostGIS 3.6.2，使用专用测试数据库，未使用用户的业务数据库。
 - Alembic head=`0003_wishlist` 实际升级成功，`alembic check` 无差异；另一个可丢弃数据库完成 upgrade → downgrade base → upgrade head → check。
 - 新数据库测试验证重复到访、未来访问、收藏幂等、scope 分组、地图分页、用户隔离、闰年/跨月/当地午夜边界、无日期 Trip 的活动归日，以及删除旅行后访问保留。
