@@ -15,9 +15,10 @@ def test_offline_migration_upgrade_and_downgrade() -> None:
     assert sql.count("CREATE INDEX idx_places_location") == 1
     assert "fk_visits_trip_owner" in sql
     assert "fk_activities_day_trip" in sql
+    assert "CREATE TABLE wishlist_items" in sql
     output.seek(0)
     output.truncate()
-    command.downgrade(config, "0002_core:base", sql=True)
+    command.downgrade(config, "0003_wishlist:base", sql=True)
     sql = output.getvalue()
     assert "DROP TABLE visits" in sql
     assert "DROP TYPE visit_source" in sql

@@ -10,11 +10,31 @@
 - 已实现 `/places/search` GET、`/places/{id}` GET，补充 `/places` POST 供 Phase 1 手工添加。坐标输入为 WGS84 latitude/longitude，范围必须合法且提供 IANA timezone。共享 Place 暂不开放更新/删除；nearby 留到地图阶段。
 - 已实现 `/visits` GET/POST，`/visits/{id}` PATCH/DELETE。列表支持 trip_id 过滤。
 - 已实现 `/trips/{id}/activities` GET/POST，`/activities/{id}` PATCH/DELETE；通过 PATCH sort_order 调整单项排序，批量 reorder 尚未实现。
-- 所有列表支持 limit（1..100，默认 50）和 offset（默认 0），meta 回传分页参数。
+- 核心 CRUD 列表支持 limit（1..100，默认 50）和 offset（默认 0），meta 回传分页参数。Phase 2 地图分页格式见下文。
 - PATCH 仅更改已提交字段，对合并后的完整实体再次验证；不可空字段显式 null 会报错。DELETE 返回 200 和空 data 的 envelope。
 - 错误统一包含 `data: null`、`meta: {}`、`error: {code,message}`。包括 VALIDATION_ERROR (422)、DATA_CONFLICT (409)、AUTH_REQUIRED (401)、DATABASE_UNAVAILABLE (503) 及实体 NOT_FOUND (404)。不暴露 SQL / 连接凭证。
 - 所有核心路由需要认证上下文。当前仅显式 development 模式使用固定本地用户，不接受客户端 user_id；production 禁止开发认证。共享 Place 可读取和创建；私有 Trip / Day / Visit / Activity 按用户隔离。
-- Visit、Activity 手工创建仅接受 MANUAL source。暂未实现 AI、上传、预订、费用、地图与日历 API。
+- Visit、Activity 手工创建仅接受 MANUAL source。暂未实现 AI、上传、预订和费用。
+
+## Phase 2 当前实现
+
+以下接口均位于 `/api/v1`，使用相同认证与 envelope，所有聚合仅包含当前用户的数据。
+
+| 接口 | 参数及 data |
+| --- | --- |
+| GET /map/summary | scope=all（默认）/domestic/international；places_count、visited_places、upcoming_places、wishlist_places、visit_count、countries_count、unknown_country_places |
+| GET /map/places | scope 同上；可选 status=visited/upcoming/wishlist；limit 默认 200、1..500，offset 默认 0；data={places,total,limit,offset} |
+| GET /map/places/{place_id} | data={place,visits,visits_total,wishlist_note}；visits 按抵达时间倒序最多 20 条；无当前用户足迹或收藏返回 404 |
+| POST /wishlist | body={place_id,note?}；200，返回 id/place_id/note/created_at；幂等，重复添加保留原有备注 |
+| DELETE /wishlist/{place_id} | 200，data=null；幂等，不影响其他用户收藏或 Visit |
+| GET /calendar/month | 必填 year=1900..2100、month=1..12；data={year,month,trips,days} |
+| GET /calendar/day | 必填 date=YYYY-MM-DD；data={date,trips,visits,activities} |
+
+MapPlace 包含 id/name、国家/行政区/城市、timezone、latitude/longitude、visit_count、upcoming_count、wishlist、last_visited_at、next_visit_at。状态可同时存在，“全部状态”的单点视觉优先级为曾至 → 将至 → 未至，列表显示全部状态。统计按 scope 计算，不受状态筛选限制；国家/地区数排除空代码。
+
+CalendarCell 包含 date、trip_ids、places_count、visits_count、activities_count、has_memory。后者表示这一天已有抵达的访问（不把尚未发生的跨日日期当成回忆）。每日 Visit 附加 place_name/timezone；Activity 附加 place_name/timezone。日期与时区规则见 DATA_MODEL 的 Phase 2 约定。
+
+`/places/nearby` 与 `/map/region/{region_id}` 仍为规划，未实现。
 
 Base:
 

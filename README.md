@@ -4,7 +4,7 @@
 
 以地图、时间和旅行档案为核心的个人旅行数据库。
 
-当前已初始化 Phase 0 → Phase 1：Next.js、FastAPI、PostgreSQL / PostGIS、Alembic、Docker Compose 和核心旅行 CRUD。AI 功能尚未开发。
+当前已实现 Phase 0 → Phase 2：基础设施、核心旅行 CRUD、真实数据地图、旅行月历、旅行详情与愿望清单。AI 功能尚未开发。
 
 ## 启动
 

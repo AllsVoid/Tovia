@@ -1,6 +1,6 @@
 # Tovia 所至 — 产品与工程文档
 
-Phase 0 → Phase 1 已初始化：Next.js Web、FastAPI、PostgreSQL / PostGIS、Alembic、Docker Compose 和核心旅行 CRUD。
+Phase 0 → Phase 2 已实现：基础设施、核心旅行 CRUD、地图与旅行月历、旅行详情录入和愿望清单。
 
 启动：在仓库根目录复制 `.env.example` 为 `.env`，运行 `docker compose up --build -d`。
 Web 使用 `http://localhost:3000`，API 文档使用 `http://localhost:8000/docs`。

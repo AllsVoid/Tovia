@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.common import Health
 
-SCHEMA_HEAD = "0002_core"
+SCHEMA_HEAD = "0003_wishlist"
 
 
 def check_health(session: Session) -> Health:

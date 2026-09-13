@@ -13,6 +13,15 @@
 - source 枚举保留完整设计值；当前手工 API 仅接受 MANUAL，没有 AI 写入路径。
 - UserIdentity、avatar 编辑、公共可见性、媒体引用属于后续阶段；本阶段提供可替换开发 AuthProvider。
 
+## Phase 2 实现约定
+
+- `0003_wishlist` 增加 WishlistItem：UUID id、user_id、place_id、priority（默认 0，暂未开放排序）、note、created_at。`(user_id, place_id)` 唯一；删除用户级联，地点外键 RESTRICT。
+- 未至是独立收藏，不以虚构 Visit 表示。曾至根据 `visited_at <= now`，将至根据 `visited_at > now` 计算。同一 Place 可同时有历史访问、未来访问和收藏；所有访问计数来自 Visit。
+- 地图中的地点必须有当前用户的 Visit 或 WishlistItem。国内范围为 CN/HK/MO/TW；海外为其他非空代码；未设置国家/地区仅在全部范围展示。
+- Trip 的日期范围包含首尾日。Visit 按 Place.timezone 投影到当地日期，正时长记录的 ended_at 为排他边界；无 ended_at 或零时长仅占抵达当天。午夜离开不占下一天。
+- 月历不依赖 Trip 才能展示 Visit。Trip 未填日期但存在 Day、Activity 或 Visit 时，相关日期仍展示容器。归档旅行仍保留历史日历。每日 places_count 对 Visit / Activity 的 place_id 去重。
+- 访问录入表单按浏览器本机时区解释 datetime-local，转换为 UTC ISO 时间后提交；页面明确显示输入时区。详情与日历按地点时区显示访问，Activity 按 TripDay 日期归属、Trip 时区显示时间。
+
 ## 1. 核心概念
 
 ### Place

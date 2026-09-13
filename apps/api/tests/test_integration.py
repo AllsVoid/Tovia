@@ -19,6 +19,118 @@ from app.routers.deps import current_user
 pytestmark = pytest.mark.integration
 
 
+def test_map_counts_wishlist_and_calendar_boundaries(database: Session) -> None:
+    user = User(display_name="explorer")
+    other = User(display_name="private")
+    database.add_all([user, other])
+    database.commit()
+    app.dependency_overrides[get_session] = lambda: database
+    app.dependency_overrides[current_user] = lambda: user
+    try:
+        with TestClient(app) as client:
+
+            def post(path: str, payload: dict) -> dict:
+                response = client.post(f"/api/v1{path}", json=payload)
+                assert response.status_code in (200, 201), response.text
+                return response.json()["data"]
+
+            def get(path: str) -> dict:
+                response = client.get(f"/api/v1{path}")
+                assert response.status_code == 200, response.text
+                return response.json()["data"]
+
+            place = post(
+                "/places",
+                {
+                    "canonical_name": "Tokyo",
+                    "country_code": "JP",
+                    "timezone": "Asia/Tokyo",
+                    "latitude": 35.68,
+                    "longitude": 139.69,
+                },
+            )
+            domestic = post(
+                "/places",
+                {
+                    "canonical_name": "Shanghai",
+                    "country_code": "CN",
+                    "timezone": "Asia/Shanghai",
+                    "latitude": 31.23,
+                    "longitude": 121.47,
+                },
+            )
+            unknown = post(
+                "/places",
+                {"canonical_name": "Unknown", "latitude": 0, "longitude": 0, "timezone": "UTC"},
+            )
+            trip = post(
+                "/trips", {"title": "跨月", "start_date": "2024-02-28", "end_date": "2024-03-02"}
+            )
+            first = post(
+                "/visits",
+                {
+                    "place_id": place["id"],
+                    "trip_id": trip["id"],
+                    "visited_at": "2024-02-28T15:30:00Z",
+                    "ended_at": "2024-03-01T15:00:00Z",
+                },
+            )
+            post("/visits", {"place_id": place["id"], "visited_at": "2024-02-29T03:00:00Z"})
+            post("/visits", {"place_id": place["id"], "visited_at": "2099-01-01T00:00:00Z"})
+            wish = post("/wishlist", {"place_id": place["id"], "note": "again"})
+            assert post("/wishlist", {"place_id": place["id"]})["id"] == wish["id"]
+            post("/wishlist", {"place_id": domestic["id"]})
+            post("/wishlist", {"place_id": unknown["id"]})
+            summary = get("/map/summary")
+            assert summary == {
+                "places_count": 3,
+                "visited_places": 1,
+                "upcoming_places": 1,
+                "wishlist_places": 3,
+                "visit_count": 2,
+                "countries_count": 2,
+                "unknown_country_places": 1,
+            }
+            page = get("/map/places?limit=1")
+            assert len(page["places"]) == 1 and page["total"] == 3
+            assert get("/map/places?scope=domestic")["total"] == 1
+            assert get("/map/places?scope=international")["total"] == 1
+            assert get("/map/places?status=upcoming")["places"][0]["id"] == place["id"]
+            detail = get(f"/map/places/{place['id']}")
+            assert detail["visits_total"] == 3 and detail["wishlist_note"] == "again"
+            assert detail["place"]["longitude"] == pytest.approx(139.69)
+            feb = get("/calendar/month?year=2024&month=2")
+            assert len(feb["days"]) == 29
+            assert feb["days"][27]["visits_count"] == 0
+            assert feb["days"][28]["visits_count"] == 2
+            assert feb["days"][28]["places_count"] == 1
+            march = get("/calendar/month?year=2024&month=3")
+            assert march["days"][0]["visits_count"] == 1
+            assert march["days"][1]["visits_count"] == 0  # midnight end is exclusive
+            assert march["days"][1]["trip_ids"] == [trip["id"]]
+            assert get("/calendar/day?date=2024-03-01")["visits"][0]["id"] == first["id"]
+            undated = post("/trips", {"title": "未定日期"})
+            day = post(f"/trips/{undated['id']}/days", {"date": "2024-02-29"})
+            post(f"/trips/{undated['id']}/activities", {"trip_day_id": day["id"], "title": "散步"})
+            daily = get("/calendar/day?date=2024-02-29")
+            assert len(daily["activities"]) == 1 and len(daily["trips"]) == 2
+            app.dependency_overrides[current_user] = lambda: other
+            assert get("/map/summary")["places_count"] == 0
+            assert client.get(f"/api/v1/map/places/{place['id']}").status_code == 404
+            assert get("/calendar/day?date=2024-02-29")["visits"] == []
+            assert get("/calendar/month?year=2024&month=2")["trips"] == []
+            assert client.delete(f"/api/v1/wishlist/{place['id']}").status_code == 200
+            app.dependency_overrides[current_user] = lambda: user
+            assert get("/map/summary")["wishlist_places"] == 3
+            assert client.delete(f"/api/v1/wishlist/{place['id']}").status_code == 200
+            assert get("/map/summary")["visit_count"] == 2
+            assert client.delete(f"/api/v1/trips/{trip['id']}").status_code == 200
+            assert get("/calendar/day?date=2024-03-01")["visits"][0]["trip_id"] is None
+            assert client.get("/api/v1/calendar/month?year=2024&month=13").status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
 @pytest.fixture
 def database() -> Iterator[Session]:
     url = os.environ.get("TEST_DATABASE_URL")

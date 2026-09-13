@@ -1,5 +1,19 @@
 # 本次初始化验证记录
 
+## Phase 2 验证（2026-09-13）
+
+- API Ruff / format / MyPy strict 通过；pytest **15 passed，无跳过**。在仓库 `.cache` 内启动临时 PostgreSQL 17.11 + PostGIS 3.6.2，使用专用测试数据库，未使用用户的业务数据库。
+- Alembic head=`0003_wishlist` 实际升级成功，`alembic check` 无差异；另一个可丢弃数据库完成 upgrade → downgrade base → upgrade head → check。
+- 新数据库测试验证重复到访、未来访问、收藏幂等、scope 分组、地图分页、用户隔离、闰年/跨月/当地午夜边界、无日期 Trip 的活动归日，以及删除旅行后访问保留。
+- Web ESLint、TypeScript strict、Prettier、Next.js production build 通过。Playwright 两条流程覆盖新建旅行、地点录入、二次到访、日历回看、地图 worker 加载及 390px 宽度。
+- 真实 API 浏览器联调：创建 Trip → Day → Activity → Place → Visit → 地图详情 → Wishlist → 月历当天记录，全部通过，无页面 JavaScript 异常。地图底图与点位、桌面/月历/手机布局经截图检查。
+- 地图依赖的 MapLibre ESM worker 改为同源静态文件，由 predev/prebuild 自动复制；Docker runner 补充 public 目录。
+- 额度恢复后的补验：按 Docker runner 的目录结构复制 public / static，启动 Next.js standalone production server，确认 worker、行政轮廓和真实地点点位均渲染；点击点位打开详情通过。测试端口 3003 通过浏览器测试代理读取真实 API，未修改开发 CORS 配置。
+- 本机 Docker 命令仍不可用，未执行 Docker 镜像或 Compose 验证，也未触发远端 CI。历史记录中的“数据库未验证”限制已由本节的真实数据库测试解除。
+- 临时数据库、下载包、截图和浏览器脚本均位于忽略的 `.cache`，不纳入提交；业务代码不包含演示记录。
+
+## Phase 0 / Phase 1 历史记录
+
 本地 Windows 环境，2026-09-13。
 
 | 检查 | 结果 |

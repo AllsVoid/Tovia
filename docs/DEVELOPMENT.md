@@ -1,4 +1,19 @@
-# Phase 0 → Phase 1 开发指南
+# Phase 0 → Phase 2 开发指南
+
+## 升级到地图与日历
+
+已有数据库请在 `apps/api` 下运行迁移：
+
+```powershell
+Set-Location apps/api
+uv run alembic upgrade head
+```
+
+新增 head 为 `0003_wishlist`。使用 Docker 时，在根目录运行 `docker compose up --build -d`，migrate 服务会执行升级。
+
+体验路径：新建旅行 → 点击旅行名称 → 添加一天/活动 → 添加地点（搜索已有地点或手工添加）→ 保存访问 → 打开地图 → 日历选中对应日期。地图也支持独立访问及未至收藏。未来抵达自动归入将至。输入时间使用本机时区，界面会提示；地点时区影响日历归日。
+
+地图底图内置，无需地图密钥。当前提供轮廓地图和数据库内地点搜索，尚未接入街道底图或在线地理编码。
 
 ## 快速启动
 

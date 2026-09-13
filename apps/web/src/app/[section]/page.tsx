@@ -1,9 +1,5 @@
 import { notFound } from "next/navigation";
 const sections: Record<string, { title: string; description: string }> = {
-  calendar: {
-    title: "旅行日历",
-    description: "旅行的日期已经开始积累，日历视图将在下一阶段开放。",
-  },
   inbox: {
     title: "收件箱",
     description: "未来可以在这里保存旅途中的原始资料。",

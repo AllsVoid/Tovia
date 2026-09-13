@@ -9,6 +9,7 @@ node_modules/
 
 # Next.js, builds and task caches (all workspace packages)
 .next/
+/apps/web/public/maplibre/
 next-env.d.ts
 out/
 dist/

@@ -219,3 +219,12 @@ class Activity(Entity, Created, Updated, Base):
     source: Mapped[VisitSource] = mapped_column(
         Enum(VisitSource, name="visit_source"), default=VisitSource.MANUAL, server_default="MANUAL"
     )
+
+
+class WishlistItem(Entity, Created, Base):
+    __tablename__ = "wishlist_items"
+    __table_args__ = (UniqueConstraint("user_id", "place_id"),)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    place_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("places.id", ondelete="RESTRICT"))
+    priority: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    note: Mapped[str | None] = mapped_column(Text)

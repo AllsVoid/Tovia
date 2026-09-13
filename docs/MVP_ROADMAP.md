@@ -44,6 +44,8 @@
 
 ## Phase 2 — Map + Calendar
 
+当前已实现本阶段：地图范围/状态筛选、访问次数、地点详情与录入、独立愿望清单、月历和当天记录，以及旅行详情中的 Day / Activity 操作。实际数据库与浏览器验证见 [VERIFICATION.md](VERIFICATION.md)。下一阶段为 Phase 3；AI 仍未开发。
+
 - 首页地图
 - 国内 / 海外切换
 - visited / upcoming / wishlist 状态

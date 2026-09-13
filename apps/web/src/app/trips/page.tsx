@@ -1,6 +1,7 @@
 "use client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { api, type TripStatus } from "@/lib/api";
 import { useUiStore } from "@/lib/ui-store";
@@ -136,7 +137,11 @@ export default function Trips() {
             className="rounded-xl border border-border bg-white p-6"
           >
             <p className="mb-3 text-xs opacity-60">{statuses[trip.status]}</p>
-            <h2 className="text-xl">{trip.title}</h2>
+            <h2 className="text-xl">
+              <Link className="hover:underline" href={`/trips/${trip.id}`}>
+                {trip.title} →
+              </Link>
+            </h2>
             <p className="mt-4 text-sm opacity-70">
               {trip.start_date ?? "日期待定"}
               {trip.end_date ? ` → ${trip.end_date}` : ""}

@@ -2,13 +2,31 @@
 
 ## Phase 0 → Phase 1 落地
 
-Monorepo 使用 npm workspaces（apps/web、packages/*），Python 由 apps/api 下的 uv.lock 独立锁定。Web 是 Next.js App Router / strict TypeScript / Tailwind / shadcn Button，TanStack Query 管理旅行查询，Zustand 仅管理表单开关。MapLibre 已安装，地图功能在 Phase 2 实现。
+Monorepo 使用 npm workspaces（apps/web、packages/*），Python 由 apps/api 下的 uv.lock 独立锁定。Web 是 Next.js App Router / strict TypeScript / Tailwind / shadcn Button，TanStack Query 管理旅行、地图与日历查询，Zustand 仅管理表单开关。
 
 FastAPI 按 routers / services / repositories / models / schemas / providers 分层。SQLAlchemy 使用同步 psycopg 会话，FastAPI 同步 handler 在线程池执行。所有 schema 变更通过 Alembic；生产应用角色可和 migration 角色分离。
 
 Compose 以 db → migrate → api → web 的依赖顺序启动，Redis 预留。认证使用 AuthProvider 接口和显式 development 实现，生产禁止该模式；正式登录接入后仍通过 User ID 关联业务数据。
 
 当前测试与启动方式见 [开发指南](DEVELOPMENT.md)。
+
+## Phase 2 落地
+
+`ExploreService` 负责地图 DTO、收藏与日历聚合；repository 用 SQL 按用户聚合 Visit、关联 WishlistItem，并按指定月份读取相关记录。路由只做参数与 envelope 转换。地图分页默认 200、上限 500；前端显示已加载/总数并可加载下一页。地点详情先展示最近 20 条访问。
+
+Web 以 `MapProvider` 隔离底图样式/视角，MapLibre 仅在客户端加载；地图不可用时仍可操作列表与表单。TanStack Query 在写入后刷新旅行、地图及日历数据。地图与日历通过 place ID / trip ID / date 链接互相跳转。
+
+MapLibre 6 的 ESM worker 使用显式同源 URL。`predev` / `prebuild` 从锁定依赖复制 worker、shared module 和 LICENSE 到 public/maplibre（生成文件，不提交），避免 bundler 的 worker URL 推断错误；参见 [官方 ESM 迁移说明](https://maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide/)。
+
+底图在 `apps/web/public/maps` 随项目提供，Docker runner 同样复制 public。当前为行政轮廓概览，不包含街道瓦片、地名标签、在线地理编码或 nearby / region API。地点搜索仅搜索数据库已有地点；新地点由用户手工输入或地图点选 WGS84 坐标。
+
+### 底图来源与许可
+
+2026-09-13 从 Natural Earth 官方仓库取得 GeoJSON，裁剪无关属性，省界文件筛选 China 及 HK/MO/TW 对应记录；保留原始几何。低分辨率数据不保证小岛和全部行政细节，不能用作导航。运行时无需请求外部地图服务。
+
+- [国家轮廓 ne_110m_admin_0_countries](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_110m_admin_0_countries.geojson)：177 features，`countries.geojson` SHA256 `226c1259c315eded4e607fcc553b90dc50a3c3b447ef41d57071c2700673bc79`。
+- [省界 ne_50m_admin_1_states_provinces](https://github.com/nvkelso/natural-earth-vector/blob/master/geojson/ne_50m_admin_1_states_provinces.geojson)：筛选后 31 features，`provinces.geojson` SHA256 `3f731da60d2fef6fb7d4acf5c2cede1de37bef69c19f7e8f70bcf27ae6cbc143`。
+- [Natural Earth 使用条款](https://www.naturalearthdata.com/about/terms-of-use/)：数据为 public domain；地图保留来源署名。
 
 ## 1. 架构目标
 
