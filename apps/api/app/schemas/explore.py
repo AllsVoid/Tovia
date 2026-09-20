@@ -32,6 +32,7 @@ class MapPlace(BaseModel):
     timezone: str
     latitude: float
     longitude: float
+    region_id: str | None = None
     visit_count: int
     upcoming_count: int
     wishlist: bool

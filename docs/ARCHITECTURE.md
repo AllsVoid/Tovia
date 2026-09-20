@@ -12,13 +12,17 @@ Compose 以 db → migrate → api → web 的依赖顺序启动，Redis 预留�
 
 ## Phase 2 落地
 
+2026-09-19 行政区改版：`providers/regions.py` 读取构建时生成的离线目录，`RegionService` 将明确选择的行政区幂等解析为 Place。路由提供搜索与解析接口，不自行构造实体。目录同时打包到 API 与 Web，边界按省拆分为静态 GeoJSON，MapLibre 按所需行政区加载面并填色。新增选择不依赖在线地理编码。详见 `apps/web/public/maps/regions/README.md` 和 `infra/scripts/build-regions.py`。
+
+原始 AreaCity GCJ-02 数据在构建时转换为 WGS84。世界地图沿用 Natural Earth，海外选择暂按国家粒度。旧 POI 的国内坐标在前端匹配市级面，只改变展示，不重写原数据。未匹配的旧地点保留列表提示。区域边界加载失败有独立重试入口。目录/几何为版本化静态派生资产，不作为每次访问记录存储。
+
 `ExploreService` 负责地图 DTO、收藏与日历聚合；repository 用 SQL 按用户聚合 Visit、关联 WishlistItem，并按指定月份读取相关记录。路由只做参数与 envelope 转换。地图分页默认 200、上限 500；前端显示已加载/总数并可加载下一页。地点详情先展示最近 20 条访问。
 
 Web 以 `MapProvider` 隔离底图样式/视角，MapLibre 仅在客户端加载；地图不可用时仍可操作列表与表单。TanStack Query 在写入后刷新旅行、地图及日历数据。地图与日历通过 place ID / trip ID / date 链接互相跳转。
 
 MapLibre 6 的 ESM worker 使用显式同源 URL。`predev` / `prebuild` 从锁定依赖复制 worker、shared module 和 LICENSE 到 public/maplibre（生成文件，不提交），避免 bundler 的 worker URL 推断错误；参见 [官方 ESM 迁移说明](https://maplibre.org/maplibre-gl-js/docs/guides/v5-to-v6-migration-guide/)。
 
-底图在 `apps/web/public/maps` 随项目提供，Docker runner 同样复制 public。当前为行政轮廓概览，不包含街道瓦片、地名标签、在线地理编码或 nearby / region API。地点搜索仅搜索数据库已有地点；新地点由用户手工输入或地图点选 WGS84 坐标。
+底图在 `apps/web/public/maps` 随项目提供，Docker runner 同样复制 public。当前为行政轮廓概览，不包含街道瓦片、在线地理编码或 nearby API。地点录入使用行政区目录搜索，不向用户索取坐标。
 
 ### 底图来源与许可
 

@@ -20,6 +20,24 @@ export interface Place {
   timezone: string;
   latitude: number;
   longitude: number;
+  metadata?: { region_id?: string };
+}
+export interface Region {
+  id: string;
+  parent_id: string | null;
+  name: string;
+  short_name: string;
+  path: string;
+  pinyin: string;
+  level: number;
+  country_code: string;
+  admin1: string | null;
+  city: string | null;
+  timezone: string;
+  longitude: number;
+  latitude: number;
+  bbox: [number, number, number, number];
+  boundary_file: string;
 }
 export interface PlaceInput {
   canonical_name: string;
@@ -76,6 +94,7 @@ export interface MapPlace {
   timezone: string;
   latitude: number;
   longitude: number;
+  region_id?: string | null;
   visit_count: number;
   upcoming_count: number;
   wishlist: boolean;

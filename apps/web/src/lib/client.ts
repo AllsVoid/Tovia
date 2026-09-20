@@ -7,6 +7,7 @@ import type {
   MapSummary,
   Place,
   PlaceInput,
+  Region,
   PlaceStatus,
   Scope,
   Trip,
@@ -79,6 +80,7 @@ export const api = {
     start_date: string | null;
     end_date: string | null;
     timezone: string;
+    status?: Trip["status"];
   }) => request<Trip>("/trips", json("POST", input)),
   updateTrip: (id: string, input: Partial<Omit<Trip, "id">>) =>
     request<Trip>(`/trips/${id}`, json("PATCH", input)),
@@ -89,6 +91,12 @@ export const api = {
   place: (id: string) => request<Place>(`/places/${id}`),
   createPlace: (input: PlaceInput) =>
     request<Place>("/places", json("POST", input)),
+  regions: (q: string) =>
+    request<Region[]>(`/regions/search?q=${encodeURIComponent(q)}`),
+  regionPlace: (id: string) =>
+    request<Place>(`/regions/${encodeURIComponent(id)}/place`, {
+      method: "POST",
+    }),
   visits: (tripId: string) =>
     collect((offset) =>
       request<Visit[]>(`/visits?trip_id=${tripId}&limit=50&offset=${offset}`),

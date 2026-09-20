@@ -20,6 +20,12 @@ export const outlineMapProvider: MapProvider = {
           '© <a href="https://www.naturalearthdata.com/">Natural Earth</a>',
       },
       provinces: { type: "geojson", data: "/maps/provinces.geojson" },
+      cities: {
+        type: "geojson",
+        data: "/maps/regions/cities.geojson",
+        attribution:
+          '© <a href="https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov">AreaCity</a>',
+      },
       visits: {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] },
@@ -51,36 +57,40 @@ export const outlineMapProvider: MapProvider = {
         paint: { "line-color": "#fbfcf7", "line-width": 0.8 },
       },
       {
+        id: "city-borders",
+        type: "line",
+        source: "cities",
+        minzoom: 4,
+        paint: {
+          "line-color": "#a9b5a1",
+          "line-width": 0.6,
+          "line-opacity": 0.65,
+        },
+      },
+      {
         id: "places",
-        type: "circle",
+        type: "fill",
         source: "visits",
         paint: {
-          "circle-radius": [
-            "interpolate",
-            ["linear"],
-            ["get", "visit_count"],
-            0,
-            6,
-            10,
-            13,
-          ],
-          "circle-color": [
+          "fill-color": [
             "match",
             ["get", "status"],
             "visited",
             "#3f6849",
             "upcoming",
             "#a8743c",
-            "#f8f7f3",
+            "#a6b2d0",
           ],
-          "circle-stroke-color": [
-            "match",
-            ["get", "status"],
-            "wishlist",
-            "#778471",
-            "#fffefa",
-          ],
-          "circle-stroke-width": 2,
+          "fill-opacity": ["case", ["get", "selected"], 0.8, 0.6],
+        },
+      },
+      {
+        id: "region-outlines",
+        type: "line",
+        source: "visits",
+        paint: {
+          "line-color": ["case", ["get", "selected"], "#203d2a", "#64775e"],
+          "line-width": ["case", ["get", "selected"], 2.5, 1],
         },
       },
     ],

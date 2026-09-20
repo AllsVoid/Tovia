@@ -18,6 +18,12 @@
 
 ## Phase 2 当前实现
 
+行政区录入补充（2026-09-19）：
+
+- `GET /api/v1/regions/search?q=南京`：认证后搜索离线目录，最多 30 条，空查询返回空数组。支持中文路径与不含空格的拼音。返回 id、parent_id、name、short_name、path、pinyin、level、country_code、admin1、city、timezone、代表坐标、bbox、boundary_file。只返回存在边界的条目。
+- `POST /api/v1/regions/{region_id}/place`：200，幂等返回 canonical PlaceRead；客户端只提交 region_id，无坐标输入。未知行政区返回 REGION_NOT_FOUND 404。选择只解析 Place，不创建 Visit；用户保存到访后才进入地图。
+- MapPlace 增加可空 `region_id`；历史 POI 可为 null。原 `/places` 手工 API 为兼容已有调用保留，Web 不再使用坐标表单。
+
 以下接口均位于 `/api/v1`，使用相同认证与 envelope，所有聚合仅包含当前用户的数据。
 
 | 接口 | 参数及 data |

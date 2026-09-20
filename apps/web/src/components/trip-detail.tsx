@@ -3,7 +3,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { api, type Trip, type TripStatus, type Visit } from "@/lib/api";
+import {
+  api,
+  type Place,
+  type Trip,
+  type TripStatus,
+  type Visit,
+} from "@/lib/api";
 import { formatInstant, tripStatuses } from "@/lib/dates";
 import { refreshTravel } from "@/lib/queries";
 import { Button } from "./ui/button";
@@ -129,11 +135,18 @@ function EditTrip({ trip, onDone }: { trip: Trip; onDone: () => void }) {
   );
 }
 
-export function TripDetail({ id }: { id: string }) {
+export function TripDetail({
+  id,
+  startAdding = false,
+}: {
+  id: string;
+  startAdding?: boolean;
+}) {
   const client = useQueryClient();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState(startAdding);
+  const [savedPlace, setSavedPlace] = useState<Place | null>(null);
   const trip = useQuery({
     queryKey: ["trip", id],
     queryFn: () => api.trip(id),
@@ -197,10 +210,43 @@ export function TripDetail({ id }: { id: string }) {
         </div>
       </header>
       {editing && <EditTrip trip={t} onDone={() => setEditing(false)} />}
+      {startAdding && !savedPlace && (
+        <div className="panel space-y-3">
+          <h2 className="text-xl">旅行已建立，添加本次地点</h2>
+          <p className="muted">
+            选择到访的城市或区县，确认抵达时间。保存后将自动高亮在“我的世界”，无需重复添加。
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setRecording(false);
+              router.replace(`/trips/${id}`);
+            }}
+          >
+            暂不添加，稍后完善
+          </Button>
+        </div>
+      )}
+      {savedPlace && (
+        <div className="panel space-y-3" role="status">
+          <p>已将 {savedPlace.canonical_name} 加入本次旅行，并更新我的世界。</p>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => setRecording(true)}>继续添加下一站</Button>
+            <Button asChild variant="outline">
+              <Link href={`/?place=${savedPlace.id}`}>查看地图高亮 →</Link>
+            </Button>
+          </div>
+        </div>
+      )}
       {recording && (
         <RecordPlace
           tripId={id}
-          onDone={() => setRecording(false)}
+          initialDate={t.start_date}
+          onDone={(place) => {
+            setRecording(false);
+            setSavedPlace(place);
+            router.replace(`/trips/${id}`);
+          }}
           onCancel={() => setRecording(false)}
         />
       )}
@@ -213,7 +259,12 @@ export function TripDetail({ id }: { id: string }) {
         <section className="panel">
           <div className="flex items-center justify-between">
             <h2 className="text-xl">地点与足迹</h2>
-            <Link className="text-link" href="/">
+            <Link
+              className="text-link"
+              href={
+                visits.data?.[0] ? `/?place=${visits.data[0].place_id}` : "/"
+              }
+            >
               打开地图 ↗
             </Link>
           </div>

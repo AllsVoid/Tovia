@@ -41,6 +41,7 @@ def map_query(
             Place.timezone,
             func.ST_Y(point).label("latitude"),
             func.ST_X(point).label("longitude"),
+            Place.metadata_["region_id"].astext.label("region_id"),
             past.label("visit_count"),
             future.label("upcoming_count"),
             wished.label("wishlist"),

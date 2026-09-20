@@ -2,6 +2,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { refreshTravel } from "@/lib/queries";
 import { Button } from "@/components/ui/button";
 import { api, type TripStatus } from "@/lib/api";
 import { useUiStore } from "@/lib/ui-store";
@@ -14,15 +16,17 @@ const statuses: Record<TripStatus, string> = {
   ARCHIVED: "已归档",
 };
 export default function Trips() {
+  const router = useRouter();
   const client = useQueryClient();
   const query = useQuery({ queryKey: ["trips"], queryFn: api.trips });
   const { tripFormOpen, setTripFormOpen } = useUiStore();
   const [formError, setFormError] = useState("");
   const mutation = useMutation({
     mutationFn: api.createTrip,
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ["trips"] });
+    onSuccess: async (trip) => {
+      await refreshTravel(client);
       setTripFormOpen(false);
+      router.push(`/trips/${trip.id}?addPlace=1`);
     },
   });
   return (
@@ -61,9 +65,19 @@ export default function Trips() {
               start_date: start || null,
               end_date: end || null,
               timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              status: String(form.get("kind")) as TripStatus,
             });
           }}
         >
+          <p className="muted">1 · 旅行信息 → 2 · 添加地点 → 3 · 地图呈现</p>
+          <label className="field">
+            这次旅行
+            <select name="kind" defaultValue="PLANNING">
+              <option value="PLANNING">规划未来旅行</option>
+              <option value="COMPLETED">补录过去旅行</option>
+              <option value="IDEA">先记下旅行灵感</option>
+            </select>
+          </label>
           <label className="block text-sm">
             旅行名称
             <input
@@ -100,7 +114,7 @@ export default function Trips() {
           )}
           <div className="flex gap-3">
             <Button disabled={mutation.isPending} type="submit">
-              {mutation.isPending ? "保存中…" : "保存旅行"}
+              {mutation.isPending ? "保存中…" : "下一步：添加地点"}
             </Button>
             <Button
               variant="outline"

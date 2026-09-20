@@ -42,7 +42,11 @@ const statusLabels: [PlaceStatus | "all", string][] = [
   ["wishlist", "○ 未至"],
 ];
 function asPlace(p: MapPlace): Place {
-  return { ...p, canonical_name: p.name };
+  return {
+    ...p,
+    canonical_name: p.name,
+    metadata: p.region_id ? { region_id: p.region_id } : undefined,
+  };
 }
 function StatusText({ place: p }: { place: MapPlace }) {
   return (
@@ -66,7 +70,6 @@ export function MyWorld() {
   const [selected, setSelected] = useState<string | null>(params.get("place"));
   const [record, setRecord] = useState<{
     place?: Place;
-    coordinates?: [number, number];
   } | null>(null);
   const client = useQueryClient();
   const summary = useQuery({
@@ -121,9 +124,9 @@ export function MyWorld() {
         <RecordPlace
           key={JSON.stringify(record)}
           initialPlace={record.place}
-          coordinates={record.coordinates}
-          onDone={() => {
+          onDone={(place) => {
             setRecord(null);
+            setSelected(place.id);
             setScope("all");
             setStatus("all");
           }}
@@ -199,10 +202,9 @@ export function MyWorld() {
             status={status}
             selectedId={selected}
             onSelect={setSelected}
-            onPick={(coordinates) => setRecord({ coordinates })}
           />
           <p className="muted mt-2">
-            点击点位查看记录；点击地图空白处可选取新地点坐标。
+            已记录的行政区以颜色高亮：绿色曾至、赭色将至、淡紫色未至。点击高亮区域查看记录。
           </p>
         </div>
         <aside aria-label="地点列表">

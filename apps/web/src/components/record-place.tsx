@@ -10,14 +10,14 @@ import { Button } from "./ui/button";
 export function RecordPlace({
   tripId,
   initialPlace = null,
-  coordinates,
+  initialDate,
   onDone,
   onCancel,
 }: {
   tripId?: string;
   initialPlace?: Place | null;
-  coordinates?: [number, number];
-  onDone: () => void;
+  initialDate?: string | null;
+  onDone: (place: Place) => void;
   onCancel: () => void;
 }) {
   const [place, setPlace] = useState<Place | null>(initialPlace);
@@ -34,7 +34,7 @@ export function RecordPlace({
       const note = String(form.get("note") ?? "").trim();
       if (mode === "wishlist") {
         await api.addWishlist(place.id, note);
-        return;
+        return place;
       }
       const start = inputToInstant(String(form.get("start")));
       const endValue = String(form.get("end") ?? "");
@@ -47,10 +47,11 @@ export function RecordPlace({
         ended_at: end,
         note: note || null,
       });
+      return place;
     },
-    onSuccess: async () => {
+    onSuccess: async (savedPlace) => {
       await refreshTravel(client);
-      onDone();
+      onDone(savedPlace);
     },
   });
   return (
@@ -67,7 +68,6 @@ export function RecordPlace({
           setPlace(p);
           mutation.reset();
         }}
-        coordinates={coordinates}
       />
       {place && (
         <form
@@ -77,22 +77,24 @@ export function RecordPlace({
             mutation.mutate(new FormData(e.currentTarget));
           }}
         >
-          <div className="segmented">
-            <button
-              type="button"
-              aria-pressed={mode === "visit"}
-              onClick={() => setMode("visit")}
-            >
-              曾至 / 将至
-            </button>
-            <button
-              type="button"
-              aria-pressed={mode === "wishlist"}
-              onClick={() => setMode("wishlist")}
-            >
-              未至 · 愿望清单
-            </button>
-          </div>
+          {!tripId && (
+            <div className="segmented">
+              <button
+                type="button"
+                aria-pressed={mode === "visit"}
+                onClick={() => setMode("visit")}
+              >
+                曾至 / 将至
+              </button>
+              <button
+                type="button"
+                aria-pressed={mode === "wishlist"}
+                onClick={() => setMode("wishlist")}
+              >
+                未至 · 愿望清单
+              </button>
+            </div>
+          )}
           {mode === "visit" && (
             <>
               <p className="muted">
@@ -106,7 +108,13 @@ export function RecordPlace({
                     type="datetime-local"
                     name="start"
                     required
-                    defaultValue={localDateTime()}
+                    defaultValue={
+                      initialDate
+                        ? `${initialDate}T09:00`
+                        : tripId
+                          ? ""
+                          : localDateTime()
+                    }
                   />
                 </label>
                 <label className="field">

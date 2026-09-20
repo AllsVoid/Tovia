@@ -19,6 +19,42 @@ from app.routers.deps import current_user
 pytestmark = pytest.mark.integration
 
 
+def test_region_selection_reuses_place_and_projects_trip_visit(database: Session) -> None:
+    user = User(display_name="region explorer")
+    database.add(user)
+    database.commit()
+    app.dependency_overrides[get_session] = lambda: database
+    app.dependency_overrides[current_user] = lambda: user
+    try:
+        with TestClient(app) as client:
+            search = client.get("/api/v1/regions/search", params={"q": "南京"})
+            assert search.status_code == 200
+            assert search.json()["data"][0]["id"] == "cn:3201"
+            first = client.post("/api/v1/regions/cn:3201/place")
+            second = client.post("/api/v1/regions/cn:3201/place")
+            assert first.status_code == second.status_code == 200
+            place = first.json()["data"]
+            assert place["id"] == second.json()["data"]["id"]
+            assert place["metadata"]["region_id"] == "cn:3201"
+            assert client.get("/api/v1/map/places").json()["data"]["total"] == 0
+            trip = client.post("/api/v1/trips", json={"title": "南京回忆"}).json()["data"]
+            visit = client.post(
+                "/api/v1/visits",
+                json={
+                    "place_id": place["id"],
+                    "trip_id": trip["id"],
+                    "visited_at": "2024-10-01T09:00:00+08:00",
+                },
+            )
+            assert visit.status_code == 201
+            marker = client.get("/api/v1/map/places").json()["data"]["places"][0]
+            assert marker["region_id"] == "cn:3201"
+            assert marker["visit_count"] == 1
+            assert client.post("/api/v1/regions/cn:invalid/place").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_map_counts_wishlist_and_calendar_boundaries(database: Session) -> None:
     user = User(display_name="explorer")
     other = User(display_name="private")

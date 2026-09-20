@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.models import Activity, Place, Trip, TripDay, Visit
+from app.providers.regions import Region
 from app.routers.deps import CurrentUser, Db
 from app.schemas.common import Envelope
 from app.schemas.core import (
@@ -25,6 +26,7 @@ from app.schemas.core import (
     VisitRead,
 )
 from app.services.core import TravelService
+from app.services.regions import RegionService
 
 router = APIRouter(prefix="/api/v1")
 
@@ -130,6 +132,18 @@ def search_places(
 @router.post("/places", status_code=201, tags=["places"])
 def create_place(payload: PlaceCreate, service: Service) -> Envelope[PlaceRead]:
     return Envelope(data=service.place_read(service.create_place(payload)))
+
+
+@router.get("/regions/search", tags=["places"])
+def regions(
+    service: Service, q: Annotated[str, Query(max_length=200)] = ""
+) -> Envelope[list[Region]]:
+    return Envelope(data=RegionService(service.session).search(q))
+
+
+@router.post("/regions/{region_id}/place", tags=["places"])
+def region_place(region_id: str, service: Service) -> Envelope[PlaceRead]:
+    return Envelope(data=service.place_read(RegionService(service.session).resolve(region_id)))
 
 
 @router.get("/places/{place_id}", tags=["places"])

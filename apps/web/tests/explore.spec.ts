@@ -19,7 +19,10 @@ test("record a place, revisit it, and open its calendar memory", async ({
   let saved = false;
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
-    const path = new URL(request.url()).pathname.replace("/api/v1", "");
+    const path = decodeURIComponent(new URL(request.url()).pathname).replace(
+      "/api/v1",
+      "",
+    );
     let data: unknown;
     const marker = {
       ...place,
@@ -30,10 +33,18 @@ test("record a place, revisit it, and open its calendar memory", async ({
       last_visited_at: visits.length ? visits[0].visited_at : null,
       next_visit_at: null,
     };
-    if (path === "/places" && request.method() === "POST") {
+    if (path === "/regions/cn:5329/place" && request.method() === "POST") {
       saved = true;
       data = place;
-    } else if (path === "/places/search") data = saved ? [place] : [];
+    } else if (path === "/regions/search")
+      data = [
+        {
+          id: "cn:5329",
+          name: "大理白族自治州",
+          path: "云南省 大理白族自治州",
+        },
+      ];
+    else if (path === "/places/search") data = saved ? [place] : [];
     else if (path === "/trips") data = [];
     else if (path === "/visits" && request.method() === "POST") {
       data = {
@@ -103,18 +114,16 @@ test("record a place, revisit it, and open its calendar memory", async ({
     timeout: 15000,
   });
   await page.getByRole("button", { name: "＋ 记录地点" }).click();
-  await page.getByRole("button", { name: "手工添加地点" }).click();
-  await page.getByLabel("地点名称", { exact: true }).fill("大理古城");
-  await page.getByLabel("经度", { exact: true }).fill("100.16");
-  await page.getByLabel("纬度", { exact: true }).fill("25.69");
-  await page.getByRole("button", { name: "保存并选择地点" }).click();
+  await expect(page.getByLabel("经度", { exact: true })).toHaveCount(0);
+  await page.getByLabel("城市或行政区").fill("大理");
+  await page.getByRole("button", { name: /大理白族自治州/ }).click();
   await page.getByLabel("抵达时间").fill("2024-02-29T09:00");
   await page.getByRole("button", { name: "保存访问记录" }).click();
   await expect(
     page.getByLabel("地点列表").getByText("曾至 1 次"),
   ).toBeVisible();
   expect(visits[0].visited_at).toBe("2024-02-29T01:00:00.000Z");
-  await page.getByLabel("地点列表").getByRole("button").click();
+  await expect(page.locator('[data-region-count="1"]')).toBeVisible();
   await page.getByRole("button", { name: "添加访问", exact: true }).click();
   await page.getByLabel("抵达时间").fill("2024-02-29T15:00");
   await page.getByRole("button", { name: "保存访问记录" }).click();
