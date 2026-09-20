@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.config import get_settings
 from app.db import get_session
+from app.errors import DomainError
 from app.main import app
 from app.models import User
 from app.providers.auth import AuthPrincipal, DevelopmentAuthProvider, resolve_user
@@ -96,5 +97,22 @@ def test_development_resolver_preserves_fixed_local_user(
         session.execute.assert_called_once()
         session.commit.assert_called_once()
         session.get.assert_called_once_with(User, user_id)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_oidc_mode_requires_bearer_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "test")
+    monkeypatch.setenv("AUTH_MODE", "oidc")
+    monkeypatch.setenv("OIDC_ISSUER", "https://auth.example.com/oidc")
+    monkeypatch.setenv("OIDC_AUDIENCE", "https://api.example.com")
+    monkeypatch.setenv("OIDC_JWKS_URL", "https://auth.example.com/oidc/jwks")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(DomainError) as error:
+            resolve_user(MagicMock())
+        assert error.value.code == "AUTH_REQUIRED"
+        assert error.value.status_code == 401
+        assert error.value.message == "Bearer access token is required"
     finally:
         get_settings.cache_clear()

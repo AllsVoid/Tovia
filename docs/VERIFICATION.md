@@ -55,6 +55,16 @@
 - Ruff、Ruff format、MyPy strict、ESLint、TypeScript strict 和 Next.js production build 通过；使用本机 Chrome 运行 Playwright，**4 passed**。本阶段没有修改 Web 生产代码、依赖或组件。
 - 仍未启用 `AUTH_MODE=oidc`，未读取 Authorization header，未增加 Logto SDK、自动注册、API 绑定接口或登录 UI。FastAPI/Starlette TestClient 的上游弃用警告保持不变。
 
+## v0.3 阶段 C — OIDC Token 验证 Provider（2026-09-20）
+
+- 新增默认关闭的 `AUTH_MODE=oidc`。配置必须同时提供 issuer、audience 和 JWKS URL，缺失时校验失败，不会回退到 development 用户。
+- API 从 Authorization header 提取 Bearer credential；provider 固定允许 RS256，通过 PyJWT 验证 JWKS 签名、issuer、audience、expiry 和非空 subject。JWKS client 按 URL 在进程内复用，集合缓存 5 分钟。
+- 验证后的 `("logto", subject)` 必须已绑定到 UserIdentity；未知 identity、已删除用户、无 token、错误 scheme 或无效 token 统一返回 `AUTH_REQUIRED` 401，不自动注册。
+- 本地 RSA 测试覆盖成功 Bearer 请求 `/api/v1/me`、过期 token、错误 audience、错误 issuer、错误签名、缺少 subject、未知 identity、非 Bearer 和 JWKS client 复用。
+- 使用隔离的 PostgreSQL 17.11 + PostGIS 3.6.2 数据库 `tovia_auth_c_test` 与可丢弃数据库 `tovia_auth_c_migration` 完成全量 Pytest：**48 passed、无跳过**，同时完成现有迁移往返。测试库已删除，临时数据库进程已停止。
+- Ruff、Ruff format、MyPy strict、ESLint、TypeScript strict、Next.js production build 通过；使用本机 Chrome 执行 Playwright，**4 passed**。
+- 新增最小后端依赖 `PyJWT[crypto]`；未增加 Logto SDK、浏览器登录、自动注册、scope/RBAC、前端组件或数据库迁移。FastAPI/Starlette TestClient 的 2 条上游弃用警告保持不变。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。

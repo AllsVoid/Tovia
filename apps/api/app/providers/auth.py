@@ -1,13 +1,20 @@
 from dataclasses import dataclass
-from typing import Protocol
+from functools import lru_cache
+from typing import Any, Protocol
 from uuid import UUID
 
+import jwt
+from jwt import PyJWK, PyJWKClient, PyJWTError
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.errors import DomainError
 from app.models import User
+from app.repositories.identity import IdentityRepository
+
+OIDC_PROVIDER = "logto"
+OIDC_ALGORITHMS = ("RS256",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +38,10 @@ class AuthProvider(Protocol):
     def authenticate(self, credential: AuthCredential | None) -> AuthPrincipal: ...
 
 
+class SigningKeyResolver(Protocol):
+    def get_signing_key_from_jwt(self, token: str) -> PyJWK: ...
+
+
 class DevelopmentAuthProvider:
     def __init__(self, user_id: UUID) -> None:
         self.user_id = user_id
@@ -43,18 +54,83 @@ class DevelopmentAuthProvider:
         )
 
 
-def resolve_user(session: Session) -> User:
-    settings = get_settings()
-    if settings.auth_mode != "development" or settings.app_env == "production":
-        raise DomainError("AUTH_REQUIRED", "Authentication provider is not configured", 401)
-    provider: AuthProvider = DevelopmentAuthProvider(settings.dev_user_id)
-    principal = provider.authenticate(None)
-    session.execute(
-        insert(User)
-        .values(id=principal.user_id, display_name="旅行者")
-        .on_conflict_do_nothing(index_elements=[User.id])
+class OidcAuthProvider:
+    def __init__(
+        self,
+        settings: Settings,
+        repository: IdentityRepository,
+        signing_keys: SigningKeyResolver,
+    ) -> None:
+        if settings.oidc_issuer is None or settings.oidc_audience is None:
+            raise ValueError("OIDC authentication is not fully configured")
+        self.issuer = str(settings.oidc_issuer)
+        self.audience = settings.oidc_audience
+        self.clock_skew_seconds = settings.oidc_clock_skew_seconds
+        self.repository = repository
+        self.signing_keys = signing_keys
+
+    def authenticate(self, credential: AuthCredential | None) -> AuthPrincipal:
+        if credential is None or credential.scheme.lower() != "bearer" or not credential.token:
+            raise DomainError("AUTH_REQUIRED", "Bearer access token is required", 401)
+
+        try:
+            signing_key = self.signing_keys.get_signing_key_from_jwt(credential.token)
+            claims: dict[str, Any] = jwt.decode(
+                credential.token,
+                signing_key,
+                algorithms=OIDC_ALGORITHMS,
+                audience=self.audience,
+                issuer=self.issuer,
+                leeway=self.clock_skew_seconds,
+                options={"require": ["exp", "iss", "aud", "sub"]},
+            )
+        except (PyJWTError, ValueError) as exc:
+            raise DomainError("AUTH_REQUIRED", "Invalid or expired access token", 401) from exc
+
+        subject = claims["sub"]
+        if not isinstance(subject, str) or not subject:
+            raise DomainError("AUTH_REQUIRED", "Invalid or expired access token", 401)
+        identity = self.repository.find(OIDC_PROVIDER, subject)
+        if identity is None:
+            raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
+        return AuthPrincipal(user_id=identity.user_id, provider=OIDC_PROVIDER, subject=subject)
+
+
+@lru_cache
+def get_oidc_signing_keys(jwks_url: str) -> PyJWKClient:
+    return PyJWKClient(
+        jwks_url,
+        cache_jwk_set=True,
+        lifespan=300,
+        timeout=5,
     )
-    session.commit()
-    user = session.get(User, principal.user_id)
-    assert user is not None
-    return user
+
+
+def resolve_user(session: Session, credential: AuthCredential | None = None) -> User:
+    settings = get_settings()
+    if settings.auth_mode == "development" and settings.app_env != "production":
+        provider: AuthProvider = DevelopmentAuthProvider(settings.dev_user_id)
+        principal = provider.authenticate(None)
+        session.execute(
+            insert(User)
+            .values(id=principal.user_id, display_name="旅行者")
+            .on_conflict_do_nothing(index_elements=[User.id])
+        )
+        session.commit()
+        user = session.get(User, principal.user_id)
+        assert user is not None
+        return user
+    if settings.auth_mode == "oidc":
+        if settings.oidc_jwks_url is None:
+            raise DomainError("AUTH_REQUIRED", "Authentication provider is not configured", 401)
+        provider = OidcAuthProvider(
+            settings,
+            IdentityRepository(session),
+            get_oidc_signing_keys(str(settings.oidc_jwks_url)),
+        )
+        principal = provider.authenticate(credential)
+        user = session.get(User, principal.user_id)
+        if user is None:
+            raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
+        return user
+    raise DomainError("AUTH_REQUIRED", "Authentication provider is not configured", 401)

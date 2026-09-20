@@ -79,7 +79,9 @@ Base:
 当前认证契约：
 
 - `AuthProvider` 接收 provider-neutral credential，返回包含本地 `user_id`、provider 和稳定 subject 的 principal。
-- 阶段 B 仍仅启用 development provider；`UserIdentity` 只供运维显式绑定，业务请求尚不读取 Bearer token，也不支持 `AUTH_MODE=oidc`。
+- 默认继续使用 development provider；显式配置 `AUTH_MODE=oidc` 时接受 `Authorization: Bearer <access-token>`。
+- OIDC token 固定使用 RS256，并严格校验 JWKS 签名、issuer、audience、expiry 和非空 subject；未知或未绑定 subject 不会自动注册。
+- OIDC subject 只通过 `("logto", subject)` 查找已存在的 `UserIdentity`，再解析为本地 User UUID。
 - 缺少、无效或过期认证返回 `AUTH_REQUIRED` 401。
 - 已认证但不允许执行某类操作时返回 403。
 - 访问其他用户的私有实体返回对应 `*_NOT_FOUND` 404，避免 ID 枚举。

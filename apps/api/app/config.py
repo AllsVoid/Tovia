@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=("../../.env", ".env"), extra="ignore")
     app_env: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://tovia:tovia_local_only@localhost:5432/tovia"
-    auth_mode: Literal["disabled", "development"] = "disabled"
+    auth_mode: Literal["disabled", "development", "oidc"] = "disabled"
     dev_user_id: UUID = UUID("00000000-0000-4000-8000-000000000001")
     oidc_issuer: AnyHttpUrl | None = None
     oidc_audience: str | None = None
@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     def validate_auth(self) -> "Settings":
         if self.app_env == "production" and self.auth_mode == "development":
             raise ValueError("Development authentication is forbidden in production")
+        if self.auth_mode == "oidc" and not all(
+            (self.oidc_issuer, self.oidc_audience, self.oidc_jwks_url)
+        ):
+            raise ValueError("OIDC authentication requires issuer, audience, and JWKS URL")
         return self
 
 

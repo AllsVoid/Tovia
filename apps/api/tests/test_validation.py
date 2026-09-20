@@ -54,8 +54,9 @@ def test_development_auth_forbidden_in_production() -> None:
         Settings(app_env="production", auth_mode="development", _env_file=None)
 
 
-def test_oidc_configuration_is_declared_but_not_an_auth_mode() -> None:
+def test_oidc_configuration_requires_all_endpoints() -> None:
     settings = Settings(
+        auth_mode="oidc",
         oidc_issuer="https://auth.example.com/oidc",
         oidc_audience="https://api.example.com",
         oidc_jwks_url="https://auth.example.com/oidc/jwks",
@@ -65,8 +66,13 @@ def test_oidc_configuration_is_declared_but_not_an_auth_mode() -> None:
     assert str(settings.oidc_issuer) == "https://auth.example.com/oidc"
     assert settings.oidc_audience == "https://api.example.com"
     assert settings.oidc_clock_skew_seconds == 60
+    assert settings.auth_mode == "oidc"
     with pytest.raises(ValidationError):
-        Settings(auth_mode="oidc", _env_file=None)
+        Settings(
+            auth_mode="oidc",
+            oidc_issuer="https://auth.example.com/oidc",
+            _env_file=None,
+        )
     with pytest.raises(ValidationError):
         Settings(oidc_clock_skew_seconds=301, _env_file=None)
 

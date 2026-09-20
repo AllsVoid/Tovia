@@ -219,7 +219,7 @@ Logto 只负责凭证、OIDC 登录和会话。Tovia 继续拥有本地 `User`�
 | --- | --- | --- | --- | --- |
 | A 认证契约与回归基线 | 已完成 | 2026-09-20 | Ruff、格式、MyPy、Pytest 22 passed；ESLint、TypeScript、production build；Playwright 4 passed | 专用 PostGIS 环境未配置，5 个数据库集成测试按既有规则跳过 |
 | B 本地身份映射模型 | 已完成 | 2026-09-20 | Ruff、格式、MyPy；Pytest 37 passed（真实 PostgreSQL/PostGIS）；ESLint、TypeScript、build、Playwright 4 passed；迁移与运维命令冒烟通过 | 尚未读取 Bearer token，按计划留到阶段 C |
-| C OIDC Token 验证 Provider | 未开始 | — | — | — |
+| C OIDC Token 验证 Provider | 已完成 | 2026-09-20 | RS256/JWKS、issuer、audience、expiry、subject 与 Bearer API 测试；完整回归见 VERIFICATION | 尚无浏览器登录与真实 Logto tenant，按计划留到阶段 D/E |
 | D 可选的 Logto 开发环境 | 未开始 | — | — | — |
 | E 最小 Web 登录与 BFF | 未开始 | — | — | — |
 | F 双用户隔离与非生产切换 | 未开始 | — | — | — |
