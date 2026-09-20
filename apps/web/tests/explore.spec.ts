@@ -132,9 +132,9 @@ test("record a place, revisit it, and open its calendar memory", async ({
   ).toBeVisible();
   await expect(page.getByLabel("地点列表").getByRole("button")).toHaveCount(1);
   await page.goto("/calendar?date=2024-02-29");
-  await expect(
-    page.getByLabel("当天记录").getByRole("link", { name: "大理古城" }),
-  ).toHaveCount(2);
+  const daily = page.getByLabel("当天记录");
+  await expect(daily.getByRole("link", { name: "大理古城" })).toHaveCount(1);
+  await expect(daily.getByText(/^到访 /)).toHaveCount(2);
   await page
     .getByLabel("当天记录")
     .getByRole("link", { name: "大理古城" })

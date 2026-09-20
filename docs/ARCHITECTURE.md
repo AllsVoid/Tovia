@@ -8,6 +8,8 @@ FastAPI 按 routers / services / repositories / models / schemas / providers 分
 
 Compose 以 db → migrate → api → web 的依赖顺序启动，Redis 预留。认证使用 AuthProvider 接口和显式 development 实现，生产禁止该模式；正式登录接入后仍通过 User ID 关联业务数据。
 
+v0.3 阶段 A 固定 provider-neutral 认证契约：HTTP 边界未来把凭证表示为 `AuthCredential`，Provider 返回 `AuthPrincipal(user_id, provider, subject)`；业务 service 只接收由该 principal 解析出的本地 User。当前 development provider 仍返回固定本地 UUID，不读取 Authorization header。OIDC 配置仅声明、尚未启用，`AUTH_MODE` 仍只允许 disabled/development。
+
 当前测试与启动方式见 [开发指南](DEVELOPMENT.md)。
 
 ## Phase 2 落地
@@ -236,6 +238,8 @@ UserIdentity
 - WeChat
 
 业务表只关联 `user_id`。
+
+认证错误边界：缺少、无效或过期凭证返回 401；已认证但无权执行某类操作返回 403；按 ID 访问其他用户私有实体时返回 404，避免泄露实体是否存在。共享 Place 仍按既有规则读取。
 
 ---
 

@@ -76,6 +76,15 @@ Base:
 
 ## Auth
 
+当前认证契约：
+
+- `AuthProvider` 接收 provider-neutral credential，返回包含本地 `user_id`、provider 和稳定 subject 的 principal。
+- 阶段 A 仅启用 development provider；尚不读取 Bearer token，也不支持 `AUTH_MODE=oidc`。
+- 缺少、无效或过期认证返回 `AUTH_REQUIRED` 401。
+- 已认证但不允许执行某类操作时返回 403。
+- 访问其他用户的私有实体返回对应 `*_NOT_FOUND` 404，避免 ID 枚举。
+- 客户端不得提交 `user_id`，业务查询始终使用认证上下文中的本地 User UUID。
+
 ```text
 GET    /me
 PATCH  /me

@@ -1,6 +1,7 @@
 import os
 from collections.abc import Iterator
 from datetime import UTC, datetime
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
@@ -65,15 +66,15 @@ def test_map_counts_wishlist_and_calendar_boundaries(database: Session) -> None:
     try:
         with TestClient(app) as client:
 
-            def post(path: str, payload: dict) -> dict:
+            def post(path: str, payload: dict[str, object]) -> dict[str, Any]:
                 response = client.post(f"/api/v1{path}", json=payload)
                 assert response.status_code in (200, 201), response.text
-                return response.json()["data"]
+                return cast(dict[str, Any], response.json()["data"])
 
-            def get(path: str) -> dict:
+            def get(path: str) -> dict[str, Any]:
                 response = client.get(f"/api/v1{path}")
                 assert response.status_code == 200, response.text
-                return response.json()["data"]
+                return cast(dict[str, Any], response.json()["data"])
 
             place = post(
                 "/places",
@@ -191,10 +192,10 @@ def test_postgis_crud_ownership_and_preserved_visits(database: Session) -> None:
     try:
         with TestClient(app) as client:
 
-            def post(path: str, payload: dict[str, object]) -> dict:
+            def post(path: str, payload: dict[str, object]) -> dict[str, Any]:
                 response = client.post(f"/api/v1{path}", json=payload)
                 assert response.status_code == 201, response.text
-                return response.json()["data"]
+                return cast(dict[str, Any], response.json()["data"])
 
             assert client.get("/health").status_code == 200
             trip = post(

@@ -37,6 +37,15 @@
 
 完整复验命令见 [DEVELOPMENT.md](DEVELOPMENT.md)。
 
+## v0.3 阶段 A — 认证契约与回归基线（2026-09-20）
+
+- 建立厂商无关的 `AuthCredential`、`AuthPrincipal` 和 `AuthProvider` 契约；现有 development provider 继续返回固定用户，disabled 模式仍拒绝业务访问。
+- 声明未来 OIDC issuer、audience、JWKS URL 和时钟偏差配置，但 `AUTH_MODE=oidc` 仍会在启动配置校验时被拒绝。未引入 Logto SDK、Bearer token 解析、数据库迁移或登录 UI。
+- 新增结构测试，确认当前 `/api/v1` 业务路由均传递依赖 `current_user`；抽样接口在 disabled 模式下统一返回现有 401 错误信封。
+- API：Ruff、Ruff format、MyPy strict 通过；pytest **22 passed、5 skipped**。跳过项需要专用 `TEST_DATABASE_URL` / `MIGRATION_TEST_DATABASE_URL`，本阶段没有数据库或领域行为变更，因此未冒险复用开发数据库。
+- Web：ESLint、TypeScript strict、Next.js production build 通过；使用本机 Chrome 执行 Playwright，**4 passed**。测试断言同步当前“同一城市聚合、多次到访分列”的既有界面，未修改生产 Web 代码。
+- 已知限制：本轮没有重新执行真实 PostgreSQL/PostGIS 集成与迁移往返；最近一次真实数据库基线仍为本文件“行政区地图与旅行录入验收”记录。FastAPI/Starlette TestClient 有 2 条上游弃用警告，不影响结果。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。
