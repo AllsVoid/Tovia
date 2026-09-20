@@ -11,7 +11,7 @@
 - 删除 Trip 时，服务先解除 Visit 的 trip_id / trip_day_id，再删除 Trip；TripDay / Activity 随容器删除。删除 Day 仅解除 Visit 的 trip_day_id。数据库 RESTRICT 外键阻止绕过服务误删访问事实。
 - 时间范围和 confidence 0..1 有数据库 CHECK；confidence 为 Numeric，Python 为 Decimal。
 - source 枚举保留完整设计值；当前手工 API 仅接受 MANUAL，没有 AI 写入路径。
-- UserIdentity、avatar 编辑、公共可见性、媒体引用属于后续阶段；本阶段提供可替换开发 AuthProvider。
+- avatar 编辑、公共可见性、媒体引用属于后续阶段；本阶段提供可替换开发 AuthProvider。
 
 ## Phase 2 实现约定
 
@@ -20,11 +20,19 @@
 - Activity 继续使用可空 `place_id` 兼容历史数据；Web 新建活动时从当前 Trip 的 Visit 城市中必选一个 Place。日历以 `place_id` 将 Visit 与 Activity 组织为城市树；空 `place_id` 进入“未分配城市”，不自动猜测关联。
 
 - `0003_wishlist` 增加 WishlistItem：UUID id、user_id、place_id、priority（默认 0，暂未开放排序）、note、created_at。`(user_id, place_id)` 唯一；删除用户级联，地点外键 RESTRICT。
+
 - 未至是独立收藏，不以虚构 Visit 表示。曾至根据 `visited_at <= now`，将至根据 `visited_at > now` 计算。同一 Place 可同时有历史访问、未来访问和收藏；所有访问计数来自 Visit。
 - 地图中的地点必须有当前用户的 Visit 或 WishlistItem。国内范围为 CN/HK/MO/TW；海外为其他非空代码；未设置国家/地区仅在全部范围展示。
 - Trip 的日期范围包含首尾日。Visit 按 Place.timezone 投影到当地日期，正时长记录的 ended_at 为排他边界；无 ended_at 或零时长仅占抵达当天。午夜离开不占下一天。
 - 月历不依赖 Trip 才能展示 Visit。Trip 未填日期但存在 Day、Activity 或 Visit 时，相关日期仍展示容器。归档旅行仍保留历史日历。每日 places_count 对 Visit / Activity 的 place_id 去重。
 - 访问录入表单按浏览器本机时区解释 datetime-local，转换为 UTC ISO 时间后提交；页面明确显示输入时区。详情与日历按地点时区显示访问，Activity 按 TripDay 日期归属、Trip 时区显示时间。
+
+## v0.3 阶段 B 实现约定
+
+- `0004_user_identity` 增加 UserIdentity，只保存本地 User UUID、provider、稳定 provider subject 和创建时间。
+- `(provider, provider_subject)` 全局唯一；同一映射重复绑定到同一用户时幂等，绑定到另一用户时拒绝。
+- 不以 email 作为身份主键，也不在本表复制 Logto 用户资料。删除本地 User 时级联删除映射。
+- 本阶段只允许运维命令显式绑定已有 User；未知用户不会被创建，运行时认证仍只使用 development provider。
 
 ## 1. 核心概念
 
@@ -104,9 +112,10 @@ id
 user_id
 provider
 provider_subject
-email
 created_at
 ```
+
+约束：`(provider, provider_subject)` 唯一，`user_id` 外键指向 User 并在用户删除时级联。
 
 ---
 

@@ -16,6 +16,9 @@ def test_offline_migration_upgrade_and_downgrade() -> None:
     assert "fk_visits_trip_owner" in sql
     assert "fk_activities_day_trip" in sql
     assert "CREATE TABLE wishlist_items" in sql
+    assert "CREATE TABLE user_identities" in sql
+    assert "uq_user_identities_provider_subject" in sql
+    assert "ix_user_identities_user_id" in sql
     output.seek(0)
     output.truncate()
     command.downgrade(config, "0003_wishlist:base", sql=True)

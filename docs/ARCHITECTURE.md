@@ -10,6 +10,8 @@ Compose 以 db → migrate → api → web 的依赖顺序启动，Redis 预留�
 
 v0.3 阶段 A 固定 provider-neutral 认证契约：HTTP 边界未来把凭证表示为 `AuthCredential`，Provider 返回 `AuthPrincipal(user_id, provider, subject)`；业务 service 只接收由该 principal 解析出的本地 User。当前 development provider 仍返回固定本地 UUID，不读取 Authorization header。OIDC 配置仅声明、尚未启用，`AUTH_MODE` 仍只允许 disabled/development。
 
+v0.3 阶段 B 增加本地 `UserIdentity` 映射。`(provider, provider_subject)` 是外部身份唯一键，只通过运维命令绑定已有 User UUID；重复绑定同一用户幂等，跨用户绑定冲突。请求路径尚不读取该表，development 身份和所有现有业务路由保持原样。Logto SDK、JWT 验证和自动注册仍未引入。
+
 当前测试与启动方式见 [开发指南](DEVELOPMENT.md)。
 
 ## Phase 2 落地

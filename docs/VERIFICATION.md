@@ -46,6 +46,15 @@
 - Web：ESLint、TypeScript strict、Next.js production build 通过；使用本机 Chrome 执行 Playwright，**4 passed**。测试断言同步当前“同一城市聚合、多次到访分列”的既有界面，未修改生产 Web 代码。
 - 已知限制：本轮没有重新执行真实 PostgreSQL/PostGIS 集成与迁移往返；最近一次真实数据库基线仍为本文件“行政区地图与旅行录入验收”记录。FastAPI/Starlette TestClient 有 2 条上游弃用警告，不影响结果。
 
+## v0.3 阶段 B — 本地身份映射模型（2026-09-20）
+
+- 新增 `UserIdentity` 模型、schema、repository/service 和 `0004_user_identity` 迁移；`(provider, provider_subject)` 唯一，用户删除时映射级联删除。
+- 运维命令只允许把 provider subject 显式绑定到已有 User UUID；相同绑定幂等、跨用户绑定返回 `IDENTITY_CONFLICT`、未知用户返回 `USER_NOT_FOUND`。真实数据库连续执行两次命令返回同一映射 ID。
+- 使用仓库缓存的 PostgreSQL 17.11 + PostGIS 3.6.2，在新建的 `tovia_auth_b_test` 和可丢弃的 `tovia_auth_b_migration` 数据库验证；未接触开发业务数据库。
+- Pytest **37 passed、无跳过**。覆盖数据库唯一约束、从 `0003_wishlist` 升级后原 User/Trip UUID 不变、空映射表、新库安装、Alembic check 及 downgrade base → upgrade head 往返。
+- Ruff、Ruff format、MyPy strict、ESLint、TypeScript strict 和 Next.js production build 通过；使用本机 Chrome 运行 Playwright，**4 passed**。本阶段没有修改 Web 生产代码、依赖或组件。
+- 仍未启用 `AUTH_MODE=oidc`，未读取 Authorization header，未增加 Logto SDK、自动注册、API 绑定接口或登录 UI。FastAPI/Starlette TestClient 的上游弃用警告保持不变。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。

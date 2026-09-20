@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.main import app
-from app.models import User, Visit
+from app.models import User, UserIdentity, Visit
 from app.routers.deps import current_user
 
 pytestmark = pytest.mark.integration
@@ -297,6 +297,33 @@ def test_schema_constraints_and_spatial_index(database: Session) -> None:
     assert database.scalar(select(text("1"))) == 1
 
 
+def test_user_identity_database_constraints(database: Session) -> None:
+    owner = User(display_name="identity owner")
+    other = User(display_name="identity other")
+    database.add_all([owner, other])
+    database.commit()
+    database.add(
+        UserIdentity(user_id=owner.id, provider="logto", provider_subject="stable-subject")
+    )
+    database.commit()
+
+    with pytest.raises(IntegrityError), database.begin_nested():
+        database.add(
+            UserIdentity(user_id=other.id, provider="logto", provider_subject="stable-subject")
+        )
+        database.flush()
+
+    assert (
+        database.scalar(
+            select(UserIdentity.user_id).where(
+                UserIdentity.provider == "logto",
+                UserIdentity.provider_subject == "stable-subject",
+            )
+        )
+        == owner.id
+    )
+
+
 def test_migration_roundtrip_on_disposable_database(monkeypatch: pytest.MonkeyPatch) -> None:
     # Explicit opt-in: never downgrade a developer's normal database.
     url = os.environ.get("MIGRATION_TEST_DATABASE_URL")
@@ -308,7 +335,38 @@ def test_migration_roundtrip_on_disposable_database(monkeypatch: pytest.MonkeyPa
     get_settings.cache_clear()
     try:
         config = Config("alembic.ini")
+        command.upgrade(config, "0003_wishlist")
+        engine = create_engine(url)
+        user_id = uuid4()
+        trip_id = uuid4()
+        with engine.begin() as connection:
+            connection.execute(
+                text("INSERT INTO users (id, display_name) VALUES (:user_id, 'migration owner')"),
+                {"user_id": user_id},
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO trips (id, user_id, title, slug) "
+                    "VALUES (:trip_id, :user_id, 'existing trip', 'existing-trip')"
+                ),
+                {"trip_id": trip_id, "user_id": user_id},
+            )
         command.upgrade(config, "head")
+        with engine.connect() as connection:
+            assert (
+                connection.scalar(
+                    text("SELECT id FROM users WHERE id = :user_id"), {"user_id": user_id}
+                )
+                == user_id
+            )
+            assert (
+                connection.scalar(
+                    text("SELECT id FROM trips WHERE id = :trip_id"), {"trip_id": trip_id}
+                )
+                == trip_id
+            )
+            assert connection.scalar(text("SELECT count(*) FROM user_identities")) == 0
+        engine.dispose()
         command.check(config)
         command.downgrade(config, "base")
         command.upgrade(config, "head")

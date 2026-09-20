@@ -9,7 +9,7 @@ Set-Location apps/api
 uv run alembic upgrade head
 ```
 
-新增 head 为 `0003_wishlist`。使用 Docker 时，在根目录运行 `docker compose up --build -d`，migrate 服务会执行升级。
+新增 head 为 `0004_user_identity`。使用 Docker 时，在根目录运行 `docker compose up --build -d`，migrate 服务会执行升级。
 
 体验路径：新建旅行 → 下一步在地点与足迹中自动展开添加城市 → 搜索城市或区县（区县归并到所属城市）→ 确认抵达时间 → 加入旅行 → 继续添加城市或查看地图高亮 → 新建旅行日并在当天卡片内添加活动。地图也支持独立访问及未至收藏，无需填写经纬度。未来抵达归入将至。输入时间使用本机时区，界面会提示；地点时区影响日历归日。
 
@@ -103,12 +103,26 @@ uv run alembic check
 
 1. `0001_postgis`：启用 PostGIS，需要数据库角色有创建 extension 的权限。
 2. `0002_core`：User、Trip、TripDay、Place、Visit、Activity 及约束和索引。
+3. `0003_wishlist`：独立愿望清单及用户/地点约束。
+4. `0004_user_identity`：外部 provider subject 到本地 User UUID 的稳定映射。
 
 `alembic downgrade 0001_postgis` 会删除核心表和全部旅行数据，仅应在可丢弃数据库上执行。继续降到 base 不删除 PostGIS extension，因为它可能被其他 schema 使用。升级脚本固定保存建表定义，不导入运行时 ORM 模型。
 
 ## 开发认证与 CRUD 验收
 
 `.env` 中 `AUTH_MODE=development` 使用固定 `DEV_USER_ID`，首次认证请求通过幂等插入创建开发用户。API 不信任客户端提交的 user_id 或任意身份 header。`AUTH_MODE=disabled` 返回 `AUTH_REQUIRED`；production 配置 development 会拒绝启动。
+
+阶段 B 可由运维人员把未来 Logto subject 显式绑定到已有用户。命令不会创建用户；同一映射重复执行返回同一记录，绑定到其他用户会以 `IDENTITY_CONFLICT` 失败：
+
+```powershell
+Set-Location apps/api
+uv run python -m app.commands.bind_identity `
+  --provider logto `
+  --subject '<logto-subject>' `
+  --user-id '<existing-user-uuid>'
+```
+
+该映射在阶段 C 之前不参与请求认证；当前仍不读取 Authorization header。
 
 通过 Swagger 顺序执行：
 
@@ -144,7 +158,7 @@ uv run mypy app
 uv run pytest
 ```
 
-不配置数据库时，pytest 执行 service、校验、API health/OpenAPI 和离线迁移测试，并明确跳过 3 个数据库测试。完整验证必须使用专用测试数据库：
+不配置数据库时，pytest 执行 service、校验、API health/OpenAPI 和离线迁移测试，并明确跳过数据库测试。完整验证必须使用专用测试数据库：
 
 ```powershell
 $env:TEST_DATABASE_URL = 'postgresql+psycopg://tovia:password@localhost:5432/tovia_test'

@@ -96,6 +96,19 @@ class User(Entity, Created, Updated, Base):
     locale: Mapped[str] = mapped_column(String(35), default="zh-CN", server_default="zh-CN")
 
 
+class UserIdentity(Entity, Created, Base):
+    __tablename__ = "user_identities"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider", "provider_subject", name="uq_user_identities_provider_subject"
+        ),
+        Index("ix_user_identities_user_id", "user_id"),
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    provider: Mapped[str] = mapped_column(String(64))
+    provider_subject: Mapped[str] = mapped_column(String(255))
+
+
 class Trip(Entity, Created, Updated, Base):
     __tablename__ = "trips"
     __table_args__ = (
