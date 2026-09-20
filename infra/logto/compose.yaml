@@ -1,0 +1,50 @@
+name: tovia-logto
+
+services:
+  logto-db:
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: ${LOGTO_POSTGRES_DB:-logto}
+      POSTGRES_USER: ${LOGTO_POSTGRES_USER:-logto}
+      POSTGRES_PASSWORD: ${LOGTO_POSTGRES_PASSWORD:-logto_local_only_change_me}
+    volumes:
+      - logto_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  logto:
+    image: svhd/logto:1.42.0
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        npm run cli db seed -- --swe --disable-admin-pwned-password-check
+        && npm start
+    environment:
+      DB_URL: postgresql://${LOGTO_POSTGRES_USER:-logto}:${LOGTO_POSTGRES_PASSWORD:-logto_local_only_change_me}@logto-db:5432/${LOGTO_POSTGRES_DB:-logto}
+      ENDPOINT: ${LOGTO_ENDPOINT:-http://localhost:3001}
+      ADMIN_ENDPOINT: ${LOGTO_ADMIN_ENDPOINT:-http://localhost:3002}
+    ports:
+      - "127.0.0.1:3001:3001"
+      - "127.0.0.1:3002:3002"
+    depends_on:
+      logto-db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          node -e
+          "fetch('http://localhost:3001/oidc/.well-known/openid-configuration')
+          .then(response => process.exit(response.ok ? 0 : 1))
+          .catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+volumes:
+  logto_postgres_data:

@@ -138,7 +138,7 @@ OIDC_CLOCK_SKEW_SECONDS=30
 
 issuer、audience 和 JWKS URL 缺少任意一项都会导致配置校验失败，不会回退到 development 用户。业务请求必须携带 `Authorization: Bearer <access-token>`。API 固定允许 RS256，验证签名、issuer、audience、expiry 和 subject，并只接受已经绑定到本地 User 的 `("logto", subject)`；未知身份返回 401，不自动创建用户。
 
-JWKS 集合在进程内缓存 5 分钟，未知 key id 由 PyJWT client 按其刷新规则处理。阶段 C 不提供浏览器登录、token 获取、scope/RBAC 或 Logto 本地容器；这些属于后续阶段。
+JWKS 集合在进程内缓存 5 分钟，未知 key id 由 PyJWT client 按其刷新规则处理。阶段 C 不提供浏览器登录或 scope/RBAC。阶段 D 已增加完全独立、默认不启动的本地 Logto Compose，以及使用 Device Flow 取得真实用户 access token 的联调步骤；见 [可选的本地 Logto 环境](../infra/logto/README.md)。浏览器 callback 和 BFF 仍属于阶段 E。
 
 实现依据：[Logto Python API protection](https://docs.logto.io/api-protection/python/flask) 与 [PyJWT API](https://pyjwt.readthedocs.io/en/latest/api.html)。
 

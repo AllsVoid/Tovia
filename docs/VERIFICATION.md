@@ -65,6 +65,15 @@
 - Ruff、Ruff format、MyPy strict、ESLint、TypeScript strict、Next.js production build 通过；使用本机 Chrome 执行 Playwright，**4 passed**。
 - 新增最小后端依赖 `PyJWT[crypto]`；未增加 Logto SDK、浏览器登录、自动注册、scope/RBAC、前端组件或数据库迁移。FastAPI/Starlette TestClient 的 2 条上游弃用警告保持不变。
 
+## v0.3 阶段 D — 可选的 Logto 开发环境（2026-09-20）
+
+- 新增独立 `tovia-logto` Compose project，固定 `svhd/logto:1.42.0` 与 `postgres:17.11-alpine`。Logto 使用独立数据库用户、容器网络和 `logto_postgres_data`，没有修改 Tovia 默认 `compose.yaml` 或 `postgres_data`。
+- 增加本地初始化、API Resource、测试用户、Device Flow 用户 token、显式 UserIdentity 绑定和阶段 C Bearer 请求验证说明。未增加浏览器 callback、BFF、Logto SDK、社交登录、组织、角色、MFA、SAML 或主题组件。
+- 增加仅在显式叠加时把 API 切换为 OIDC 的 Compose override；普通 `docker compose up` 继续使用 development 认证。
+- 文档记录固定版本升级、数据库 alteration、SQL 备份、保留数据停止及独立卷删除方式。
+- 静态配置与文档通过 Prettier 和 `git diff --check`；默认 `compose.yaml` 无差异。API Ruff、format、MyPy 通过；Pytest **42 passed、6 skipped**，跳过项仍是未配置专用 PostgreSQL 的既有集成测试。Web ESLint、TypeScript、production build 通过，并使用本机 Chrome 完成 Playwright **4 passed**。
+- 本机没有 Docker CLI，无法启动 Logto 容器或取得真实 token，因此容器健康、Device Flow 与阶段 C 的端到端联调仍需在具备 Docker 的环境复验；本阶段不把静态配置检查宣称为运行时通过。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。
