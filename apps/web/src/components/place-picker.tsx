@@ -42,9 +42,9 @@ export function PlacePicker({
       </div>
     );
   return (
-    <section className="space-y-4" aria-label="选择地点">
+    <section className="space-y-3" aria-label="选择地点">
       <label className="field">
-        城市或行政区
+        城市
         <input
           value={q}
           maxLength={200}
@@ -53,7 +53,7 @@ export function PlacePicker({
         />
       </label>
       <p className="muted">
-        选择省、市或区县，保存到访后在地图上高亮对应区域。海外目前支持国家或地区。
+        可用区县名称搜索，记录会归入所属城市；海外目前按国家或地区记录。
       </p>
       {q.trim() && search.isPending && (
         <p role="status" className="muted">
@@ -63,7 +63,7 @@ export function PlacePicker({
       {search.error && (
         <QueryError error={search.error} retry={() => void search.refetch()} />
       )}
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2">
         {search.data?.map((r) => (
           <button
             type="button"
@@ -78,9 +78,7 @@ export function PlacePicker({
         ))}
       </div>
       {search.data?.length === 0 && (
-        <p className="muted">
-          没有匹配的行政区。试试城市全名或所属省份；当前不支持的地区不会要求你填写坐标。
-        </p>
+        <p className="muted">没有匹配的城市。试试城市、区县或所属省份名称。</p>
       )}
       {search.data?.length === 30 && (
         <p className="muted">显示前 30 个结果，请输入更具体的名称。</p>

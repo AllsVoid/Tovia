@@ -20,6 +20,8 @@ class RegionService:
         region = catalog().get(region_id)
         if region is None:
             raise DomainError("REGION_NOT_FOUND", "Region boundary is not available", 404)
+        if region.id.startswith("cn:") and region.level != 1:
+            raise DomainError("REGION_LEVEL_UNSUPPORTED", "Select the containing city", 422)
         # Stable identity plus ON CONFLICT protects repeat selection and concurrent requests.
         place_id = uuid5(NAMESPACE_URL, f"https://tovia.local/regions/{region.id}")
         self.session.execute(

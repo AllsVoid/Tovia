@@ -15,7 +15,7 @@
 
 ## Phase 2 实现约定
 
-- 行政区选择新增 `Place.metadata.region_id`（例如 `cn:3201`），对应版本化边界目录；旧 Place 可无此字段。行政区 Place 的 UUID 由命名空间与 region_id 确定，数据库冲突保护保证多次选择/并发选择不产生多个同区 Place；每次访问仍独立保存。无新增表或迁移。
+- 行政区选择新增 `Place.metadata.region_id`（例如南京市 `cn:3201`），对应版本化边界目录；国内新建足迹只解析市级 region_id，区县仅作为搜索别名并提升到父级城市。旧 Place 可无此字段。行政区 Place 的 UUID 由命名空间与 region_id 确定，数据库冲突保护保证多次选择/并发选择不产生多个同城 Place；每次访问仍独立保存。无新增表或迁移。
 - 地图从目录读取 Polygon/MultiPolygon；内部 location 仍是 WGS84 代表坐标，不向用户展示输入框。高亮不向父行政区传播，不代表访问其所有下级地区。已有 POI 按坐标投影到所在市，仅聚合显示，访问次数仍来自原 Visit。国外旧地点按所属国家显示。
 
 - `0003_wishlist` 增加 WishlistItem：UUID id、user_id、place_id、priority（默认 0，暂未开放排序）、note、created_at。`(user_id, place_id)` 唯一；删除用户级联，地点外键 RESTRICT。

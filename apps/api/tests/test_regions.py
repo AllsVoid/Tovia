@@ -10,9 +10,11 @@ from app.services.regions import RegionService
 def test_search_disambiguates_city_district_and_pinyin() -> None:
     assert search_regions("南京")[0].id == "cn:3201"
     assert search_regions("nanjing")[0].id == "cn:3201"
-    districts = search_regions("鼓楼")
-    assert len({r.path for r in districts}) > 1
-    assert all(r.name == "鼓楼区" for r in districts)
+    cities = search_regions("鼓楼")
+    assert {r.id for r in cities} >= {"cn:3201", "cn:3203"}
+    assert all(r.level == 1 for r in cities)
+    assert all(r.name != "鼓楼区" for r in cities)
+    assert all(r.level == 1 for r in search_regions("江苏"))
     assert search_regions("") == []
     assert search_regions("不存在的行政区") == []
     city = catalog()["cn:3201"]
@@ -37,3 +39,6 @@ def test_resolve_uses_stable_identity_and_database_conflict_guard() -> None:
     assert first.params["canonical_name"] == "南京市"
     with pytest.raises(DomainError):
         service.resolve("cn:missing")
+    with pytest.raises(DomainError) as district_error:
+        service.resolve("cn:320106")
+    assert district_error.value.code == "REGION_LEVEL_UNSUPPORTED"

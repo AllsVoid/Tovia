@@ -13,6 +13,27 @@ for (const future of [false, true]) {
   }) => {
     let trip: Trip | undefined;
     const visits: (VisitInput & { id: string })[] = [];
+    const days: {
+      id: string;
+      trip_id: string;
+      date: string;
+      title: string | null;
+      note: null;
+      sort_order: number;
+    }[] = [];
+    const activities: {
+      id: string;
+      trip_id: string;
+      trip_day_id: string;
+      title: string;
+      place_id: null;
+      type: string;
+      start_at: null;
+      end_at: null;
+      status: string;
+      note: null;
+      sort_order: number;
+    }[] = [];
     const places = [
       {
         id: "nanjing",
@@ -60,7 +81,35 @@ for (const future of [false, true]) {
         data = trip;
       } else if (pathname === "/trips") data = trip ? [trip] : [];
       else if (pathname === "/trips/trip-1") data = trip;
-      else if (/\/trips\/trip-1\/(days|activities)/.test(pathname)) data = [];
+      else if (pathname === "/trips/trip-1/days" && req.method() === "POST") {
+        data = {
+          ...req.postDataJSON(),
+          id: `day-${days.length}`,
+          trip_id: "trip-1",
+          title: req.postDataJSON().title ?? null,
+          note: null,
+          sort_order: 0,
+        };
+        days.push(data as (typeof days)[number]);
+      } else if (pathname === "/trips/trip-1/days") data = days;
+      else if (
+        pathname === "/trips/trip-1/activities" &&
+        req.method() === "POST"
+      ) {
+        data = {
+          ...req.postDataJSON(),
+          id: `activity-${activities.length}`,
+          trip_id: "trip-1",
+          place_id: null,
+          type: "VISIT",
+          start_at: null,
+          end_at: null,
+          status: "PLANNED",
+          note: null,
+          sort_order: 0,
+        };
+        activities.push(data as (typeof activities)[number]);
+      } else if (pathname === "/trips/trip-1/activities") data = activities;
       else if (pathname === "/visits" && req.method() === "POST") {
         data = { ...req.postDataJSON(), id: `visit-${visits.length}` };
         visits.push(data as (typeof visits)[number]);
@@ -120,31 +169,35 @@ for (const future of [false, true]) {
     await page.getByLabel("开始日期").fill(date);
     await page.getByLabel("结束日期").fill(date);
     await page.getByRole("button", { name: "下一步：添加地点" }).click();
-    await expect(
-      page.getByRole("heading", { name: "旅行已建立，添加本次地点" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "添加城市" })).toBeVisible();
     await expect(page.getByLabel("抵达时间")).toHaveCount(0);
-    await page.getByLabel("城市或行政区").fill("南京");
+    await page.getByLabel("城市", { exact: true }).fill("南京");
     await page.getByRole("button", { name: /南京市/ }).click();
     await expect(page.getByLabel("抵达时间")).toHaveValue(`${date}T09:00`);
     await expect(page.getByLabel("经度", { exact: true })).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: "未至 · 愿望清单" }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "保存访问记录" }).click();
-    await expect(
-      page.getByText("已将 南京市 加入本次旅行，并更新我的世界。"),
-    ).toBeVisible();
+    await page.getByRole("button", { name: "加入旅行" }).click();
+    await expect(page.getByText("南京市 已加入旅行并更新地图。")).toBeVisible();
     expect(visits[0].trip_id).toBe("trip-1");
     expect(visits[0].visited_at).toBe(`${date}T01:00:00.000Z`);
-    await page.getByRole("button", { name: "继续添加下一站" }).click();
-    await page.getByLabel("城市或行政区").fill("苏州");
+    await page.getByRole("button", { name: "继续添加城市" }).click();
+    await page.getByLabel("城市", { exact: true }).fill("苏州");
     await page.getByRole("button", { name: /苏州市/ }).click();
-    await page.getByRole("button", { name: "保存访问记录" }).click();
-    await expect(
-      page.getByText("已将 苏州市 加入本次旅行，并更新我的世界。"),
-    ).toBeVisible();
-    await page.getByRole("link", { name: "查看地图高亮 →" }).click();
+    await page.getByRole("button", { name: "加入旅行" }).click();
+    await expect(page.getByText("苏州市 已加入旅行并更新地图。")).toBeVisible();
+    await page.getByLabel("当天主题").fill("城南漫步");
+    await page.getByRole("button", { name: "添加一天" }).click();
+    await expect(page.getByText("城南漫步 · 打开日历 ↗")).toBeVisible();
+    await page.getByLabel("添加当天活动").fill("逛当地市场");
+    await page.getByRole("button", { name: "＋ 添加活动" }).click();
+    await expect(page.getByText("逛当地市场", { exact: true })).toBeVisible();
+    await page.screenshot({
+      path: `test-results/trip-detail-${future ? "future" : "past"}.png`,
+      fullPage: true,
+    });
+    await page.getByRole("link", { name: "查看地图 →" }).click();
     await expect(page.locator('[data-region-count="2"]')).toBeVisible({
       timeout: 20000,
     });

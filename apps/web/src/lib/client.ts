@@ -31,6 +31,7 @@ const messages: Record<string, string> = {
   DATA_CONFLICT: "这条记录已存在，或关联关系有冲突。",
   TRIP_NOT_FOUND: "旅行不存在或已删除。",
   MAP_PLACE_NOT_FOUND: "你的地图中暂时没有这个地点。",
+  REGION_LEVEL_UNSUPPORTED: "请选择这个区县所属的城市。",
 };
 async function request<T>(
   path: string,

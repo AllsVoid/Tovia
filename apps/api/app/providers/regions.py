@@ -39,11 +39,24 @@ def search_regions(query: str, limit: int = 30) -> list[Region]:
     query = query.strip().lower()
     if not query:
         return []
+    source = catalog()
     matches = [
         r
-        for r in catalog().values()
+        for r in source.values()
         if query in r.path.lower() or query.replace(" ", "") in r.pinyin.replace(" ", "").lower()
     ]
+    # A trip footprint is city-level. District names remain useful search terms,
+    # but resolve to their parent city instead of creating overly precise map data.
+    promoted: dict[str, Region] = {}
+    for region in matches:
+        if region.id.startswith("cn:"):
+            city = region if region.level == 1 else source.get(region.parent_id or "")
+            if city is None or city.level != 1:
+                continue
+            promoted[city.id] = city
+        else:
+            promoted[region.id] = region
     return sorted(
-        matches, key=lambda r: (r.name != query and r.short_name != query, r.level, r.path)
+        promoted.values(),
+        key=lambda r: (r.name != query and r.short_name != query, r.path),
     )[:limit]

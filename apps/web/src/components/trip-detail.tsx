@@ -206,78 +206,97 @@ export function TripDetail({
           <Button variant="outline" onClick={() => setEditing(!editing)}>
             编辑旅行
           </Button>
-          <Button onClick={() => setRecording(!recording)}>添加地点</Button>
+          <Button onClick={() => setRecording(!recording)}>添加城市</Button>
         </div>
       </header>
       {editing && <EditTrip trip={t} onDone={() => setEditing(false)} />}
-      {startAdding && !savedPlace && (
-        <div className="panel space-y-3">
-          <h2 className="text-xl">旅行已建立，添加本次地点</h2>
-          <p className="muted">
-            选择到访的城市或区县，确认抵达时间。保存后将自动高亮在“我的世界”，无需重复添加。
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setRecording(false);
-              router.replace(`/trips/${id}`);
-            }}
-          >
-            暂不添加，稍后完善
-          </Button>
-        </div>
-      )}
-      {savedPlace && (
-        <div className="panel space-y-3" role="status">
-          <p>已将 {savedPlace.canonical_name} 加入本次旅行，并更新我的世界。</p>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => setRecording(true)}>继续添加下一站</Button>
-            <Button asChild variant="outline">
-              <Link href={`/?place=${savedPlace.id}`}>查看地图高亮 →</Link>
-            </Button>
-          </div>
-        </div>
-      )}
-      {recording && (
-        <RecordPlace
-          tripId={id}
-          initialDate={t.start_date}
-          onDone={(place) => {
-            setRecording(false);
-            setSavedPlace(place);
-            router.replace(`/trips/${id}`);
-          }}
-          onCancel={() => setRecording(false)}
-        />
-      )}
       {action.error && (
         <p role="alert" className="error-message">
           {action.error.message}
         </p>
       )}
-      <div className="grid items-start gap-6 xl:grid-cols-2">
-        <section className="panel">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(260px,0.72fr)_minmax(440px,1.5fr)]">
+        <section className="panel space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl">地点与足迹</h2>
-            <Link
-              className="text-link"
-              href={
-                visits.data?.[0] ? `/?place=${visits.data[0].place_id}` : "/"
-              }
-            >
-              打开地图 ↗
-            </Link>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => setRecording(!recording)}
+              >
+                {recording ? "取消添加" : "＋ 添加城市"}
+              </button>
+              <Link
+                className="text-link"
+                href={
+                  visits.data?.[0] ? `/?place=${visits.data[0].place_id}` : "/"
+                }
+              >
+                地图 ↗
+              </Link>
+            </div>
           </div>
-          <p className="muted mt-2">每次到访单独保存，同一地点可以记录多次。</p>
-          {visits.isPending && <p className="muted mt-4">正在读取足迹…</p>}
+          <p className="muted">按城市记录足迹；区县名称会归入所属城市。</p>
+          {recording && (
+            <div className="border-t border-border pt-4">
+              <RecordPlace
+                embedded
+                tripId={id}
+                initialDate={t.start_date}
+                onDone={(place) => {
+                  setRecording(false);
+                  setSavedPlace(place);
+                  router.replace(`/trips/${id}`);
+                }}
+                onCancel={() => {
+                  setRecording(false);
+                  router.replace(`/trips/${id}`);
+                }}
+              />
+            </div>
+          )}
+          {savedPlace && !recording && (
+            <div
+              className="rounded-lg bg-muted px-4 py-3 text-sm"
+              role="status"
+            >
+              <p>{savedPlace.canonical_name} 已加入旅行并更新地图。</p>
+              <div className="mt-2 flex flex-wrap gap-4">
+                <button
+                  className="text-button"
+                  onClick={() => setRecording(true)}
+                >
+                  继续添加城市
+                </button>
+                <Link className="text-link" href={`/?place=${savedPlace.id}`}>
+                  查看地图 →
+                </Link>
+              </div>
+            </div>
+          )}
+          {startAdding &&
+            !recording &&
+            !savedPlace &&
+            visits.data?.length === 0 && (
+              <button
+                className="text-button"
+                onClick={() => setRecording(true)}
+              >
+                ＋ 添加第一个城市
+              </button>
+            )}
+          {visits.isPending && <p className="muted">正在读取足迹…</p>}
           {visits.error && (
             <QueryError
               error={visits.error}
               retry={() => void visits.refetch()}
             />
           )}
-          {visits.data?.length === 0 && (
-            <p className="empty-state">还没有地点。添加一次到访或未来行程。</p>
+          {visits.data?.length === 0 && !recording && !savedPlace && (
+            <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-sm text-[#667360]">
+              还没有城市足迹。
+            </p>
           )}
           {visits.data?.map((v) => (
             <VisitRow
@@ -291,9 +310,12 @@ export function TripDetail({
           ))}
         </section>
         <section className="panel space-y-5">
-          <h2 className="text-xl">每日安排</h2>
+          <div>
+            <h2 className="text-xl">每日安排</h2>
+            <p className="muted mt-1">先建立旅行日，再直接在当天添加活动。</p>
+          </div>
           <form
-            className="space-y-3"
+            className="rounded-xl border border-dashed border-border bg-[#fbfcf8] p-4"
             onSubmit={(e) => {
               e.preventDefault();
               const form = e.currentTarget;
@@ -302,9 +324,10 @@ export function TripDetail({
               });
             }}
           >
-            <div className="form-grid">
+            <p className="mb-3 text-sm font-medium">＋ 新建旅行日</p>
+            <div className="grid gap-3 md:grid-cols-[minmax(150px,0.8fr)_minmax(200px,1.2fr)_auto] md:items-end">
               <label className="field">
-                行程日期
+                日期
                 <input
                   name="date"
                   type="date"
@@ -315,22 +338,22 @@ export function TripDetail({
                 />
               </label>
               <label className="field">
-                当天主题（选填）
+                当天主题
                 <input
                   name="title"
                   maxLength={200}
                   placeholder="例如：沿河漫步"
                 />
               </label>
+              <Button disabled={addDay.isPending}>
+                {addDay.isPending ? "添加中…" : "添加一天"}
+              </Button>
             </div>
             {addDay.error && (
               <p role="alert" className="error-message">
                 {addDay.error.message}
               </p>
             )}
-            <Button variant="outline" disabled={addDay.isPending}>
-              添加一天
-            </Button>
           </form>
           {days.error && (
             <QueryError error={days.error} retry={() => void days.refetch()} />
@@ -341,12 +364,26 @@ export function TripDetail({
               retry={() => void activities.refetch()}
             />
           )}
+          {days.data?.length === 0 && (
+            <p className="muted rounded-lg border border-border px-4 py-6 text-center">
+              还没有每日安排，从上方添加旅行日开始。
+            </p>
+          )}
           {days.data?.map((day) => (
-            <article key={day.id} className="border-t border-border pt-4">
+            <article
+              key={day.id}
+              className="rounded-xl border border-border p-4"
+            >
               <div className="flex justify-between gap-3">
-                <Link className="text-link" href={`/calendar?date=${day.date}`}>
-                  {day.date} · {day.title || "自由探索"} ↗
-                </Link>
+                <div>
+                  <p className="font-medium">{day.date}</p>
+                  <Link
+                    className="muted text-link"
+                    href={`/calendar?date=${day.date}`}
+                  >
+                    {day.title || "自由探索"} · 打开日历 ↗
+                  </Link>
+                </div>
                 <button
                   className="text-button"
                   disabled={action.isPending}
@@ -362,7 +399,7 @@ export function TripDetail({
                   删除一天
                 </button>
               </div>
-              <ul className="mt-3 space-y-2">
+              <ul className="mt-4 space-y-2">
                 {activities.data
                   ?.filter((a) => a.trip_day_id === day.id)
                   .map((a) => (
@@ -384,47 +421,36 @@ export function TripDetail({
                     </li>
                   ))}
               </ul>
+              <form
+                className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const form = e.currentTarget;
+                  addActivity.mutate(new FormData(form), {
+                    onSuccess: () => form.reset(),
+                  });
+                }}
+              >
+                <input type="hidden" name="day" value={day.id} />
+                <label className="field min-w-52 flex-1">
+                  添加当天活动
+                  <input
+                    name="title"
+                    required
+                    maxLength={200}
+                    placeholder="例如：逛当地市场"
+                  />
+                </label>
+                <Button variant="outline" disabled={addActivity.isPending}>
+                  ＋ 添加活动
+                </Button>
+              </form>
             </article>
           ))}
-          {!!days.data?.length && (
-            <form
-              className="space-y-3 border-t border-border pt-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                addActivity.mutate(new FormData(form), {
-                  onSuccess: () => form.reset(),
-                });
-              }}
-            >
-              <label className="field">
-                安排在哪一天
-                <select name="day">
-                  {days.data.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.date} {d.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="field">
-                活动名称
-                <input
-                  name="title"
-                  required
-                  maxLength={200}
-                  placeholder="例如：逛一逛当地市场"
-                />
-              </label>
-              {addActivity.error && (
-                <p role="alert" className="error-message">
-                  {addActivity.error.message}
-                </p>
-              )}
-              <Button variant="outline" disabled={addActivity.isPending}>
-                添加活动
-              </Button>
-            </form>
+          {addActivity.error && (
+            <p role="alert" className="error-message">
+              {addActivity.error.message}
+            </p>
           )}
         </section>
       </div>

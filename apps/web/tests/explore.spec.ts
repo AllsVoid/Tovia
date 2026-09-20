@@ -115,7 +115,7 @@ test("record a place, revisit it, and open its calendar memory", async ({
   });
   await page.getByRole("button", { name: "＋ 记录地点" }).click();
   await expect(page.getByLabel("经度", { exact: true })).toHaveCount(0);
-  await page.getByLabel("城市或行政区").fill("大理");
+  await page.getByLabel("城市", { exact: true }).fill("大理");
   await page.getByRole("button", { name: /大理白族自治州/ }).click();
   await page.getByLabel("抵达时间").fill("2024-02-29T09:00");
   await page.getByRole("button", { name: "保存访问记录" }).click();
