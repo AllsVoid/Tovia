@@ -1,7 +1,12 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useState } from "react";
 import {
   api,
@@ -163,6 +168,18 @@ export function TripDetail({
     queryKey: ["activities", id],
     queryFn: () => api.activities(id),
   });
+  const visitPlaceIds = [
+    ...new Set(visits.data?.map((visit) => visit.place_id) ?? []),
+  ];
+  const visitPlaces = useQueries({
+    queries: visitPlaceIds.map((placeId) => ({
+      queryKey: ["place", placeId],
+      queryFn: () => api.place(placeId),
+    })),
+  });
+  const tripPlaces = visitPlaces.flatMap((query) =>
+    query.data ? [query.data] : [],
+  );
   const action = useMutation({
     mutationFn: (run: () => Promise<unknown>) => run(),
     onSuccess: () => refreshTravel(client),
@@ -180,6 +197,7 @@ export function TripDetail({
       api.createActivity(id, {
         trip_day_id: String(form.get("day")),
         title: String(form.get("title")).trim(),
+        place_id: String(form.get("place")) || null,
       }),
     onSuccess: () => refreshTravel(client),
   });
@@ -421,30 +439,46 @@ export function TripDetail({
                     </li>
                   ))}
               </ul>
-              <form
-                className="mt-4 flex flex-wrap items-end gap-2 border-t border-border pt-4"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const form = e.currentTarget;
-                  addActivity.mutate(new FormData(form), {
-                    onSuccess: () => form.reset(),
-                  });
-                }}
-              >
-                <input type="hidden" name="day" value={day.id} />
-                <label className="field min-w-52 flex-1">
-                  添加当天活动
-                  <input
-                    name="title"
-                    required
-                    maxLength={200}
-                    placeholder="例如：逛当地市场"
-                  />
-                </label>
-                <Button variant="outline" disabled={addActivity.isPending}>
-                  ＋ 添加活动
-                </Button>
-              </form>
+              {tripPlaces.length ? (
+                <form
+                  className="mt-4 grid gap-2 border-t border-border pt-4 md:grid-cols-[minmax(120px,0.55fr)_minmax(200px,1fr)_auto] md:items-end"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const form = e.currentTarget;
+                    addActivity.mutate(new FormData(form), {
+                      onSuccess: () => form.reset(),
+                    });
+                  }}
+                >
+                  <input type="hidden" name="day" value={day.id} />
+                  <label className="field">
+                    所属城市
+                    <select name="place" required>
+                      {tripPlaces.map((place) => (
+                        <option key={place.id} value={place.id}>
+                          {place.canonical_name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="field">
+                    添加当天活动
+                    <input
+                      name="title"
+                      required
+                      maxLength={200}
+                      placeholder="例如：逛当地市场"
+                    />
+                  </label>
+                  <Button variant="outline" disabled={addActivity.isPending}>
+                    ＋ 添加活动
+                  </Button>
+                </form>
+              ) : (
+                <p className="muted mt-4 border-t border-border pt-4">
+                  先添加旅行城市，再安排当天活动。
+                </p>
+              )}
             </article>
           ))}
           {addActivity.error && (

@@ -26,7 +26,7 @@ for (const future of [false, true]) {
       trip_id: string;
       trip_day_id: string;
       title: string;
-      place_id: null;
+      place_id: string | null;
       type: string;
       start_at: null;
       end_at: null;
@@ -100,7 +100,6 @@ for (const future of [false, true]) {
           ...req.postDataJSON(),
           id: `activity-${activities.length}`,
           trip_id: "trip-1",
-          place_id: null,
           type: "VISIT",
           start_at: null,
           end_at: null,
@@ -114,6 +113,43 @@ for (const future of [false, true]) {
         data = { ...req.postDataJSON(), id: `visit-${visits.length}` };
         visits.push(data as (typeof visits)[number]);
       } else if (pathname === "/visits") data = visits;
+      else if (pathname === "/calendar/month")
+        data = {
+          year: Number(date.slice(0, 4)),
+          month: Number(date.slice(5, 7)),
+          trips: trip ? [trip] : [],
+          days: [
+            {
+              date,
+              trip_ids: ["trip-1"],
+              places_count: 2,
+              visits_count: visits.length,
+              activities_count: activities.length,
+              has_memory: !future,
+            },
+          ],
+        };
+      else if (pathname === "/calendar/day")
+        data = {
+          date,
+          trips: trip ? [trip] : [],
+          visits: visits.map((visit) => {
+            const place = places.find((item) => item.id === visit.place_id)!;
+            return {
+              ...visit,
+              place_name: place.canonical_name,
+              timezone: place.timezone,
+            };
+          }),
+          activities: activities.map((activity) => {
+            const place = places.find((item) => item.id === activity.place_id);
+            return {
+              ...activity,
+              place_name: place?.canonical_name ?? null,
+              timezone: place?.timezone ?? trip?.timezone ?? "UTC",
+            };
+          }),
+        };
       else if (pathname === "/regions/search") {
         const p = url.searchParams.get("q")?.includes("苏州")
           ? places[1]
@@ -190,9 +226,11 @@ for (const future of [false, true]) {
     await page.getByLabel("当天主题").fill("城南漫步");
     await page.getByRole("button", { name: "添加一天" }).click();
     await expect(page.getByText("城南漫步 · 打开日历 ↗")).toBeVisible();
+    await page.getByLabel("所属城市").selectOption("nanjing");
     await page.getByLabel("添加当天活动").fill("逛当地市场");
     await page.getByRole("button", { name: "＋ 添加活动" }).click();
     await expect(page.getByText("逛当地市场", { exact: true })).toBeVisible();
+    expect(activities[0].place_id).toBe("nanjing");
     await page.screenshot({
       path: `test-results/trip-detail-${future ? "future" : "past"}.png`,
       fullPage: true,
@@ -209,6 +247,15 @@ for (const future of [false, true]) {
     ).toHaveCount(2);
     await page.screenshot({
       path: `test-results/regions-${future ? "future" : "past"}.png`,
+    });
+    await page.goto(`/calendar?date=${date}`);
+    const nanjingTree = page.getByRole("region", { name: "南京市" });
+    await expect(nanjingTree.getByText("逛当地市场 →")).toBeVisible();
+    await expect(nanjingTree.getByText(/到访/)).toBeVisible();
+    await expect(page.getByText("地点待定")).toHaveCount(0);
+    await page.screenshot({
+      path: `test-results/calendar-tree-${future ? "future" : "past"}.png`,
+      fullPage: true,
     });
   });
 }

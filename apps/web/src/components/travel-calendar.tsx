@@ -3,10 +3,47 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
+import { api, type CalendarDay } from "@/lib/api";
 import { formatInstant, localDate } from "@/lib/dates";
 import { Button } from "./ui/button";
 import { QueryError } from "./query-error";
+
+type DayVisit = CalendarDay["visits"][number];
+type DayActivity = CalendarDay["activities"][number];
+
+function groupDayRecords(day: CalendarDay) {
+  const groups = new Map<
+    string,
+    {
+      placeId: string | null;
+      placeName: string;
+      visits: DayVisit[];
+      activities: DayActivity[];
+    }
+  >();
+  const getGroup = (placeId: string | null, placeName: string | null) => {
+    const key = placeId ?? "unassigned";
+    const current = groups.get(key) ?? {
+      placeId,
+      placeName: placeName ?? "未分配城市",
+      visits: [],
+      activities: [],
+    };
+    groups.set(key, current);
+    return current;
+  };
+  day.visits.forEach((visit) =>
+    getGroup(visit.place_id, visit.place_name).visits.push(visit),
+  );
+  day.activities.forEach((activity) =>
+    getGroup(activity.place_id, activity.place_name).activities.push(activity),
+  );
+  return [...groups.values()].sort((a, b) => {
+    if (a.placeId === null) return 1;
+    if (b.placeId === null) return -1;
+    return a.placeName.localeCompare(b.placeName, "zh-CN");
+  });
+}
 
 export function TravelCalendar() {
   const params = useSearchParams();
@@ -172,35 +209,74 @@ export function TravelCalendar() {
                   </p>
                 </Link>
               ))}
-              {detail.data.visits.map((v) => (
-                <div key={v.id} className="border-l-2 border-border pl-4">
-                  <Link
-                    href={`/?place=${v.place_id}`}
-                    className="font-medium underline underline-offset-4"
-                  >
-                    {v.place_name}
-                  </Link>
-                  <p className="muted">
-                    {formatInstant(v.visited_at, v.timezone)}
-                  </p>
-                  <p className="muted">{v.timezone}</p>
-                  {v.note && (
-                    <p className="mt-1 text-sm whitespace-pre-wrap">{v.note}</p>
+              {groupDayRecords(detail.data).map((group) => (
+                <section
+                  key={group.placeId ?? "unassigned"}
+                  aria-label={group.placeName}
+                  className="relative pl-5"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-1 bottom-1 left-0 border-l-2 border-border"
+                  />
+                  <div className="relative">
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-2 -left-[23px] h-2 w-2 rounded-full bg-[#607b64]"
+                    />
+                    {group.placeId ? (
+                      <Link
+                        href={`/?place=${group.placeId}`}
+                        className="font-medium underline underline-offset-4"
+                      >
+                        {group.placeName}
+                      </Link>
+                    ) : (
+                      <p className="font-medium">{group.placeName}</p>
+                    )}
+                    {group.visits.map((visit) => (
+                      <div key={visit.id} className="mt-1">
+                        <p className="muted">
+                          到访 {formatInstant(visit.visited_at, visit.timezone)}
+                        </p>
+                        {visit.note && (
+                          <p className="text-sm whitespace-pre-wrap">
+                            {visit.note}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {group.activities.length > 0 && (
+                    <ul className="mt-3 ml-1 space-y-2">
+                      {group.activities.map((activity) => (
+                        <li
+                          key={activity.id}
+                          className="relative border-l border-border py-1 pl-4"
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-4 left-0 w-3 border-t border-border"
+                          />
+                          <Link
+                            href={`/trips/${activity.trip_id}`}
+                            className="text-sm font-medium"
+                          >
+                            {activity.title} →
+                          </Link>
+                          {activity.start_at && (
+                            <p className="muted">
+                              {formatInstant(
+                                activity.start_at,
+                                activity.timezone,
+                              )}
+                            </p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </div>
-              ))}
-              {detail.data.activities.map((a) => (
-                <div key={a.id} className="border-l-2 border-border pl-4">
-                  <Link href={`/trips/${a.trip_id}`} className="font-medium">
-                    {a.title} →
-                  </Link>
-                  <p className="muted">
-                    {a.place_name ?? "地点待定"}
-                    {a.start_at
-                      ? ` · ${formatInstant(a.start_at, a.timezone)}`
-                      : ""}
-                  </p>
-                </div>
+                </section>
               ))}
               {!detail.data.trips.length &&
                 !detail.data.visits.length &&

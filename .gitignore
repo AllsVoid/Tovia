@@ -116,5 +116,6 @@ Desktop.ini
 $RECYCLE.BIN/
 
 # Commit dependency lockfiles, Alembic migrations, fixtures, shared tool settings,
-# and project agent instructions; do not add blanket ignores for these files.
+# project documentation, and project agent instructions; do not add blanket
+# ignores for these files.
 docs/

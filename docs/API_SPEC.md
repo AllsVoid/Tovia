@@ -40,6 +40,8 @@ MapPlace 包含 id/name、国家/行政区/城市、timezone、latitude/longitud
 
 CalendarCell 包含 date、trip_ids、places_count、visits_count、activities_count、has_memory。后者表示这一天已有抵达的访问（不把尚未发生的跨日日期当成回忆）。每日 Visit 附加 place_name/timezone；Activity 附加 place_name/timezone。日期与时区规则见 DATA_MODEL 的 Phase 2 约定。
 
+Web 使用 CalendarDay 中 Visit/Activity 的 `place_id` 与 `place_name` 构建“城市 → 到访与活动”树。API 保持返回事实列表，不嵌入特定展示结构；Activity.place_id 为 null 时客户端显示为“未分配城市”。
+
 `/places/nearby` 与 `/map/region/{region_id}` 仍为规划，未实现。
 
 Base:

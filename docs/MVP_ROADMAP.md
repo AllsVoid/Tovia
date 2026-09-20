@@ -1,5 +1,7 @@
 # Tovia 所至 — MVP Roadmap v0.1
 
+> 1.0 的版本范围、状态、验收标准和变更记录以 [RELEASE_PLAN_1_0.md](RELEASE_PLAN_1_0.md) 为准。本文保留原始 Phase 视角，用于说明能力之间的先后依赖。
+
 ## Phase 0 — Foundation
 
 目标：项目可运行。
@@ -46,7 +48,7 @@
 
 当前已实现本阶段：地图范围/状态筛选、访问次数、地点详情与录入、独立愿望清单、月历和当天记录，以及旅行详情中的 Day / Activity 操作。实际数据库与浏览器验证见 [VERIFICATION.md](VERIFICATION.md)。下一阶段为 Phase 3；AI 仍未开发。
 
-后续体验改进：填写旅途及行程地点后，地图自动展示相应的计划地点，减少重复手动录入。当前暂不实现；具体计划地点与 Visit 的映射规则在开发前补充，继续遵守 Place != Visit。
+旅行创建后的城市录入已经生成明确的 Visit，并自动进入地图；每日 Activity 选择旅行已有城市，通过 `place_id` 与 Visit 在日历中形成城市树。该流程继续遵守 Place != Visit。
 
 - 首页地图
 - 国内 / 海外切换
