@@ -32,7 +32,13 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 2. 在 **Applications** 新建 Native 应用，认证方式选择 **Device flow**，名称使用 `Tovia Stage D Token Test`，记下 App ID（即 `client_id`）。Device Flow 是公开客户端，不需要 App Secret。
 3. 在 **User management** 新建一个仅供本地联调的测试用户，设置用户名和密码。
 
-阶段 E 才会创建 Web application 和实现 callback。预留值为登录回调 `http://localhost:3000/callback`、退出后地址 `http://localhost:3000/`、Web origin `http://localhost:3000`；阶段 D 不需要配置或实现这些路由。
+阶段 E 使用时，再在 **Applications** 新建 Traditional Web 应用 `Tovia Web`，配置：
+
+- Redirect URI：`http://localhost:3000/callback`
+- Post sign-out redirect URI：`http://localhost:3000/`
+- API Resource：沿用 `https://api.tovia.local`
+
+把该应用的 App ID 和 App Secret 写入 `apps/web/.env.local`。不要复用 Device Flow 应用，也不要把 App Secret 提交到仓库。
 
 ## 3. 获取用户 access token
 

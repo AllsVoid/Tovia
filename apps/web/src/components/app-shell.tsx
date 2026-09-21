@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Globe2, Inbox, Notebook, UserRound } from "lucide-react";
+import { AuthStatus } from "@/components/auth-status";
+import { webOidcEnabled } from "@/lib/auth-mode";
 
 const links = [
   { href: "/", label: "我的世界", icon: Globe2 },
@@ -42,7 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="app-body">
         <header className="app-topbar">
           <span>个人空间 / {current?.label ?? "旅行"}</span>
-          <span>所至 · 旅行簿</span>
+          {webOidcEnabled ? <AuthStatus /> : <span>所至 · 旅行簿</span>}
         </header>
         <main className="app-content">{children}</main>
       </div>

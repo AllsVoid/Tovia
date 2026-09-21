@@ -74,6 +74,16 @@
 - 静态配置与文档通过 Prettier 和 `git diff --check`；默认 `compose.yaml` 无差异。API Ruff、format、MyPy 通过；Pytest **42 passed、6 skipped**，跳过项仍是未配置专用 PostgreSQL 的既有集成测试。Web ESLint、TypeScript、production build 通过，并使用本机 Chrome 完成 Playwright **4 passed**。
 - 本机没有 Docker CLI，无法启动 Logto 容器或取得真实 token，因此容器健康、Device Flow 与阶段 C 的端到端联调仍需在具备 Docker 的环境复验；本阶段不把静态配置检查宣称为运行时通过。
 
+## v0.3 阶段 E — 最小 Web 登录与 BFF（2026-09-21）
+
+- 固定新增 `@logto/next` 4.2.11，提供默认关闭的 `/sign-in`、`/callback` 和 `/sign-out`。SDK 使用至少 32 字符密钥加密 session cookie，并设置 HttpOnly、SameSite=Lax；浏览器端不保存或读取 access token / refresh token。
+- 同源 BFF 当前只开放固定的 `GET /api/bff/me`。服务端取得 API Resource access token，并转发到 FastAPI `/api/v1/me`，不接受客户端 Authorization、`x-user-id`、`user_id` 或其他 query；不复制客户端身份 header。
+- 客户端仅对该 BFF 读取处理 401：第二次请求使 SDK 有机会执行 refresh token 续期，仍返回 401 时进入 `/sign-in`。其余地图、日历、旅行读写仍走现有 `NEXT_PUBLIC_API_URL`，未提前执行阶段 F 的批量迁移。
+- 默认关闭模式生产构建通过；显式 `NEXT_PUBLIC_WEB_AUTH_MODE=oidc` 且未提供 secret 时同样可以构建，运行时认证路由明确返回 503，不回退到 development 身份。ESLint、TypeScript、Prettier 和 npm audit（0 vulnerabilities）通过。
+- Playwright 默认关闭模式 **5 passed、3 skipped**，覆盖原有 4 条核心流程和“不请求 BFF”的新回归；显式开启模式认证用例 **3 passed、1 skipped**，覆盖一次 401 重试成功、重试失败进入登录、BFF 拒绝 query/header 身份输入。
+- API Ruff、format、MyPy 通过；Pytest **42 passed、6 skipped**，跳过项需要专用 PostgreSQL，阶段 E 没有后端或数据库修改。
+- 本机仍没有 Docker CLI，无法完成真实 Logto authorization code、过期 token refresh、FastAPI `/me` 和 Logto 全局退出的端到端流程。Roadmap 因此标记为“实现完成（待真实 Logto 验收）”，没有把受控浏览器响应测试宣称为真实身份系统 E2E。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。

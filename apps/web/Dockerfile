@@ -7,7 +7,9 @@ COPY packages/schemas/package.json packages/schemas/package.json
 RUN npm ci
 COPY apps/web/ apps/web/
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WEB_AUTH_MODE=development
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
+    NEXT_PUBLIC_WEB_AUTH_MODE=$NEXT_PUBLIC_WEB_AUTH_MODE
 RUN npm run build
 
 FROM node:24-alpine

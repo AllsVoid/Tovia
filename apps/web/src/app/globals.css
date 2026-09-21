@@ -93,6 +93,17 @@ textarea {
   color: #6e796c;
   border-bottom: 1px solid var(--border);
 }
+.auth-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.auth-status a,
+.app-topbar > a {
+  color: #3c6247;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 .app-content {
   padding: 34px;
 }
