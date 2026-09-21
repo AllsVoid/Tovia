@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from functools import lru_cache
+import logging
 from typing import Any, Protocol
 from uuid import UUID
 
@@ -14,7 +15,8 @@ from app.models import User
 from app.repositories.identity import IdentityRepository
 
 OIDC_PROVIDER = "logto"
-OIDC_ALGORITHMS = ("RS256",)
+OIDC_ALGORITHMS = ("ES384", "RS256")
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +87,7 @@ class OidcAuthProvider:
                 options={"require": ["exp", "iss", "aud", "sub"]},
             )
         except (PyJWTError, ValueError) as exc:
+            logger.warning("OIDC token diagnostic: %s", exc)
             raise DomainError("AUTH_REQUIRED", "Invalid or expired access token", 401) from exc
 
         subject = claims["sub"]

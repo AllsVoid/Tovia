@@ -171,6 +171,11 @@ async function proxy(
   try {
     token = await getAccessToken(getLogtoConfig(), getLogtoApiResource());
     apiUrl = getToviaApiUrl();
+    const [header, payload] = token.split(".");
+    console.info("OIDC token diagnostic", {
+      header: JSON.parse(Buffer.from(header, "base64url").toString("utf8")),
+      payload: JSON.parse(Buffer.from(payload, "base64url").toString("utf8")),
+    });
   } catch (error) {
     if (error instanceof WebAuthConfigError) {
       return jsonError(
@@ -179,6 +184,7 @@ async function proxy(
         "Web authentication is not configured",
       );
     }
+    console.error("OIDC session diagnostic", error);
     return jsonError(401, "AUTH_REQUIRED", "Sign in is required");
   }
 

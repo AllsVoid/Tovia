@@ -12,7 +12,7 @@ v0.3 阶段 A 固定 provider-neutral 认证契约：HTTP 边界未来把凭证�
 
 v0.3 阶段 B 增加本地 `UserIdentity` 映射。`(provider, provider_subject)` 是外部身份唯一键，只通过运维命令绑定已有 User UUID；重复绑定同一用户幂等，跨用户绑定冲突。请求路径尚不读取该表，development 身份和所有现有业务路由保持原样。Logto SDK、JWT 验证和自动注册仍未引入。
 
-v0.3 阶段 C 增加默认关闭的 OIDC provider。HTTP dependency 只把 Authorization Bearer 凭证转换为 `AuthCredential`；provider 使用进程级复用、5 分钟 JWKS 集合缓存的 PyJWT client，固定允许 RS256，并验证签名、issuer、audience、expiry 和 subject。验证后的 `("logto", subject)` 必须已存在于 `UserIdentity`，否则返回 401；不会按 token 或 email 自动注册。业务 service 仍只接收本地 User。
+v0.3 阶段 C 增加默认关闭的 OIDC provider。HTTP dependency 只把 Authorization Bearer 凭证转换为 `AuthCredential`；provider 使用进程级复用、5 分钟 JWKS 集合缓存的 PyJWT client，只允许 Logto 默认的 ES384 和密钥轮换可用的 RS256，并验证签名、issuer、audience、expiry 和 subject。验证后的 `("logto", subject)` 必须已存在于 `UserIdentity`，否则返回 401；不会按 token 或 email 自动注册。业务 service 仍只接收本地 User。
 
 v0.3 阶段 E 增加默认关闭的 Web OIDC 边界。Next.js 使用 Logto 官方服务端 SDK，把 access token、refresh token 和登录事务保存在加密 HttpOnly cookie；浏览器不接触 token。
 

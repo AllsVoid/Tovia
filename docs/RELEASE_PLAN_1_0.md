@@ -68,7 +68,7 @@ Logto 正式身份采用渐进式接入，分阶段范围、回归门槛和回�
 
 - 阶段 A 已完成（2026-09-20）：建立与身份厂商无关的认证凭证、主体契约和配置边界；补齐 API 认证保护与现有开发身份的回归测试。此阶段没有引入 Logto SDK、OIDC 运行模式、数据库迁移或登录界面，现有运行行为保持不变。
 - 阶段 B 已完成（2026-09-20）：新增本地 `UserIdentity` 映射、唯一约束、向前兼容迁移和显式运维绑定命令；真实 PostgreSQL/PostGIS 验证原有 User/Trip UUID 保持不变。请求认证仍只使用 development provider。
-- 阶段 C 已完成（2026-09-20）：增加默认关闭的 OIDC Bearer provider，固定 RS256 并校验 JWKS 签名、issuer、audience、expiry 和 subject；只解析已绑定的本地身份，不自动注册。浏览器登录仍未接入。
+- 阶段 C 已完成（2026-09-20）：增加默认关闭的 OIDC Bearer provider，只允许 Logto 默认的 ES384 和密钥轮换可用的 RS256，并校验 JWKS 签名、issuer、audience、expiry 和 subject；只解析已绑定的本地身份，不自动注册。浏览器登录仍未接入。
 - 后续阶段按 [AUTH_LOGTO_ROADMAP.md](AUTH_LOGTO_ROADMAP.md) 逐步实施；每阶段独立验证和回滚，不跨阶段预装组件。
 
 ### 必须实现

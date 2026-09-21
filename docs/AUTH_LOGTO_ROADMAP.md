@@ -219,7 +219,7 @@ Logto 只负责凭证、OIDC 登录和会话。Tovia 继续拥有本地 `User`�
 | --- | --- | --- | --- | --- |
 | A 认证契约与回归基线 | 已完成 | 2026-09-20 | Ruff、格式、MyPy、Pytest 22 passed；ESLint、TypeScript、production build；Playwright 4 passed | 专用 PostGIS 环境未配置，5 个数据库集成测试按既有规则跳过 |
 | B 本地身份映射模型 | 已完成 | 2026-09-20 | Ruff、格式、MyPy；Pytest 37 passed（真实 PostgreSQL/PostGIS）；ESLint、TypeScript、build、Playwright 4 passed；迁移与运维命令冒烟通过 | 尚未读取 Bearer token，按计划留到阶段 C |
-| C OIDC Token 验证 Provider | 已完成 | 2026-09-20 | RS256/JWKS、issuer、audience、expiry、subject 与 Bearer API 测试；完整回归见 VERIFICATION | 尚无浏览器登录与真实 Logto tenant，按计划留到阶段 D/E |
+| C OIDC Token 验证 Provider | 已完成 | 2026-09-20 | ES384/RS256、JWKS、issuer、audience、expiry、subject 与 Bearer API 测试；完整回归见 VERIFICATION | 尚无浏览器登录与真实 Logto tenant，按计划留到阶段 D/E |
 | D 可选的 Logto 开发环境 | 实现完成（待运行验收） | 2026-09-20 | 独立 Compose project、数据库用户与持久卷；固定 Logto/PostgreSQL 镜像；Device Flow token 与阶段 C 联调步骤；默认 Compose 静态回归 | 本机无 Docker，未执行容器启动与真实 token 端到端验证，需在具备 Docker 的环境按 README 复验 |
 | E 最小 Web 登录与 BFF | 实现完成（待真实 Logto 验收） | 2026-09-21 | 官方 Next.js SDK、加密 HttpOnly session、登录/callback/退出、固定 `/api/bff/me`、一次 401 重试与身份输入拒绝测试 | 本机无 Docker，真实 Logto 登录、token refresh 和退出仍需按 DEVELOPMENT 复验 |
 | F 双用户隔离与非生产切换 | 实现完成（待真实双账户验收） | 2026-09-21 | 全部现有 Web API 切到白名单 BFF；默认/OIDC Playwright 5/8 passed；真实 PostgreSQL/PostGIS Pytest 48 passed，覆盖跨用户读改删与 ID 隔离 | 本机无 Docker，尚未执行真实 Logto 双账户和真实身份浏览器 E2E；按 DEVELOPMENT 与 infra/logto/README 复验后方可关闭验收项 |

@@ -63,7 +63,8 @@ test.describe("optional web OIDC", () => {
     page,
   }) => {
     let requests = 0;
-    await page.route("**/api/bff/me", async (route) => {
+    let signInRequests = 0;
+    await page.route("**/api/bff/**", async (route) => {
       requests += 1;
       await route.fulfill({
         status: 401,
@@ -76,6 +77,7 @@ test.describe("optional web OIDC", () => {
       });
     });
     await page.route("**/sign-in", async (route) => {
+      signInRequests += 1;
       await route.fulfill({ status: 200, body: "sign-in" });
     });
 
@@ -84,7 +86,7 @@ test.describe("optional web OIDC", () => {
     // Next.js development Strict Mode can issue one aborted probe before the
     // mounted effect performs its two-request retry sequence.
     expect(requests).toBeGreaterThanOrEqual(2);
-    expect(requests).toBeLessThanOrEqual(3);
+    expect(signInRequests).toBe(1);
   });
 
   test("BFF rejects client-provided identity inputs", async ({ request }) => {
