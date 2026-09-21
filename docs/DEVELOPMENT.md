@@ -142,9 +142,9 @@ JWKS 集合在进程内缓存 5 分钟，未知 key id 由 PyJWT client 按其�
 
 实现依据：[Logto Python API protection](https://docs.logto.io/api-protection/python/flask) 与 [PyJWT API](https://pyjwt.readthedocs.io/en/latest/api.html)。
 
-## 可选 Web 登录与最小 BFF
+## 可选 Web 登录与阶段 F BFF
 
-阶段 E 默认关闭，现有地图、日历和旅行请求继续直接使用 `NEXT_PUBLIC_API_URL`。启用后只有顶栏登录状态通过同源 `GET /api/bff/me` 读取当前用户；其他 API 调用留到阶段 F 分批迁移。
+Web OIDC 默认关闭，现有地图、日历和旅行请求继续直接使用 `NEXT_PUBLIC_API_URL`。启用后，顶栏登录状态以及现有旅行、地点、访问、地图、日历和收藏请求全部通过同源 `/api/bff/*`；未列入 BFF 白名单的 method、path 或 query 会被拒绝。
 
 先按 [本地 Logto 环境](../infra/logto/README.md) 启动 Logto、创建 `Tovia Web` Traditional Web 应用和测试用户，并完成 UserIdentity 绑定。复制 Web 配置：
 
@@ -167,7 +167,9 @@ LOGTO_API_RESOURCE=https://api.tovia.local
 
 Logto Console 必须允许 callback `http://localhost:3000/callback` 和 post sign-out redirect `http://localhost:3000/`。启动已切到 OIDC 的 FastAPI，然后在仓库根目录运行 `npm run dev`。访问 `/sign-in` 登录；callback 只在服务端交换 token，SDK 将 token 状态加密保存到 HttpOnly cookie；`/sign-out` 同时清除本地会话并退出 Logto 会话。
 
-BFF 不读取浏览器提供的 Bearer token，也拒绝 `Authorization`、`x-user-id` 和任何 query。它通过 `TOVIA_API_URL` 调用固定的 `/api/v1/me`。客户端收到 401 后再请求一次，使 SDK 有机会用 refresh token 续期；第二次仍为 401 时回到 `/sign-in`。关闭 `NEXT_PUBLIC_WEB_AUTH_MODE` 并重启 Web 即恢复原有 development 路径。
+BFF 不读取浏览器提供的 Bearer token，也拒绝 `Authorization`、`x-user-id`，以及 query 或 JSON body 任意层级中的 `user_id`。它只把白名单中的业务请求转发到 `TOVIA_API_URL/api/v1`。客户端收到 401 后再请求一次，使 SDK 有机会用 refresh token 续期；第二次仍为 401 时回到 `/sign-in`，网络故障不会被误判为登录过期。关闭 `NEXT_PUBLIC_WEB_AUTH_MODE` 并重启 Web 即恢复原有 development 路径，已有身份映射不需要回滚。
+
+阶段 F 双账户验收使用两个独立 Logto 测试用户和两个已有的本地 User UUID。分别执行 `bind_identity`，不要按 email 自动匹配，也不要让两个 subject 指向同一 User。账号 A 创建旅行、访问、活动和收藏后退出，再以账号 B 登录：列表中不得出现 A 的记录；直接访问 A 的已知 ID，以及修改或删除请求均应返回 404。最后切回账号 A，确认数据未被 B 修改。再让浏览器 session 失效，确认业务请求只重试一次并进入 `/sign-in`。完整验收必须连接真实 FastAPI 与专用 PostgreSQL，不能用浏览器 mock 代替。
 
 本地 Logto endpoint 使用 `localhost` 时，建议让 Web 运行在宿主机；容器内的 `localhost` 不指向 Logto。具有统一可访问域名的部署环境可通过 Compose 给 Web 注入相同变量。
 

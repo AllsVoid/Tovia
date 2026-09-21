@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CalendarDays, Globe2, Inbox, Notebook, UserRound } from "lucide-react";
 import { AuthStatus } from "@/components/auth-status";
+import { AuthRedirect } from "@/components/auth-redirect";
 import { webOidcEnabled } from "@/lib/auth-mode";
 
 const links = [
@@ -19,6 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
   return (
     <div className="app-shell">
+      {webOidcEnabled && <AuthRedirect />}
       <aside className="app-sidebar">
         <Link href="/" className="brand">
           Tovia<span>所 至</span>

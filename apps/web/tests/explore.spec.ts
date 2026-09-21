@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { apiPath, apiPattern, currentUser } from "./api-route";
 
 test.use({ timezoneId: "Asia/Shanghai" });
 
@@ -17,12 +18,9 @@ test("record a place, revisit it, and open its calendar memory", async ({
   };
   const visits: Record<string, unknown>[] = [];
   let saved = false;
-  await page.route("**/api/v1/**", async (route) => {
+  await page.route(apiPattern, async (route) => {
     const request = route.request();
-    const path = decodeURIComponent(new URL(request.url()).pathname).replace(
-      "/api/v1",
-      "",
-    );
+    const path = apiPath(request.url());
     let data: unknown;
     const marker = {
       ...place,
@@ -33,7 +31,8 @@ test("record a place, revisit it, and open its calendar memory", async ({
       last_visited_at: visits.length ? visits[0].visited_at : null,
       next_visit_at: null,
     };
-    if (path === "/regions/cn:5329/place" && request.method() === "POST") {
+    if (path === "/me") data = currentUser;
+    else if (path === "/regions/cn:5329/place" && request.method() === "POST") {
       saved = true;
       data = place;
     } else if (path === "/regions/search")

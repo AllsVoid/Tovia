@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AuthRequiredError, getCurrentUser } from "@/lib/bff-client";
+import { AuthRequiredError } from "@/lib/auth-events";
+import { api } from "@/lib/client";
 import type { User } from "@/lib/types";
 
 type AuthState =
@@ -12,24 +12,21 @@ type AuthState =
   | { status: "error" };
 
 export function AuthStatus() {
-  const router = useRouter();
   const [state, setState] = useState<AuthState>({ status: "loading" });
 
   useEffect(() => {
     const controller = new AbortController();
-    getCurrentUser(controller.signal)
+    api
+      .me(controller.signal)
       .then((user) => setState({ status: "authenticated", user }))
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === "AbortError")
           return;
-        if (error instanceof AuthRequiredError) {
-          router.replace("/sign-in");
-          return;
-        }
+        if (error instanceof AuthRequiredError) return;
         setState({ status: "error" });
       });
     return () => controller.abort();
-  }, [router]);
+  }, []);
 
   if (state.status === "loading") {
     return <span role="status">正在确认登录…</span>;

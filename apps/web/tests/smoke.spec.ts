@@ -4,6 +4,7 @@ import { outlineMapProvider } from "../src/lib/map-provider";
 import type { MapPlace, Trip, VisitInput } from "../src/lib/types";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { apiPath, apiPattern, currentUser } from "./api-route";
 
 test.use({ timezoneId: "Asia/Shanghai" });
 
@@ -59,10 +60,10 @@ for (const future of [false, true]) {
       },
     ];
     const date = future ? "2099-10-01" : "2024-10-01";
-    await page.route("**/api/v1/**", async (route) => {
+    await page.route(apiPattern, async (route) => {
       const req = route.request(),
-        url = new URL(req.url());
-      const pathname = url.pathname.replace("/api/v1", "");
+        url = new URL(req.url()),
+        pathname = apiPath(url.toString());
       const markers = places
         .filter((p) => visits.some((v) => v.place_id === p.id))
         .map((p) => ({
@@ -76,7 +77,8 @@ for (const future of [false, true]) {
           next_visit_at: null,
         }));
       let data: unknown;
-      if (pathname === "/trips" && req.method() === "POST") {
+      if (pathname === "/me") data = currentUser;
+      else if (pathname === "/trips" && req.method() === "POST") {
         trip = { ...req.postDataJSON(), id: "trip-1", summary: null };
         data = trip;
       } else if (pathname === "/trips") data = trip ? [trip] : [];

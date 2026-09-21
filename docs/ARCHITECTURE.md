@@ -14,7 +14,9 @@ v0.3 阶段 B 增加本地 `UserIdentity` 映射。`(provider, provider_subject)
 
 v0.3 阶段 C 增加默认关闭的 OIDC provider。HTTP dependency 只把 Authorization Bearer 凭证转换为 `AuthCredential`；provider 使用进程级复用、5 分钟 JWKS 集合缓存的 PyJWT client，固定允许 RS256，并验证签名、issuer、audience、expiry 和 subject。验证后的 `("logto", subject)` 必须已存在于 `UserIdentity`，否则返回 401；不会按 token 或 email 自动注册。业务 service 仍只接收本地 User。
 
-v0.3 阶段 E 增加默认关闭的 Web OIDC 边界。Next.js 使用 Logto 官方服务端 SDK，把 access token、refresh token 和登录事务保存在加密 HttpOnly cookie；浏览器不接触 token。当前同源 BFF 只开放固定的 `GET /api/bff/me`，由服务端从会话取得 access token 后转发到 FastAPI，且拒绝客户端 Authorization、`x-user-id` 和查询参数。既有旅行、地图和日历请求仍走 `NEXT_PUBLIC_API_URL`，留到阶段 F 分批迁移。
+v0.3 阶段 E 增加默认关闭的 Web OIDC 边界。Next.js 使用 Logto 官方服务端 SDK，把 access token、refresh token 和登录事务保存在加密 HttpOnly cookie；浏览器不接触 token。
+
+阶段 F 在开关开启时把现有旅行、地点、访问、地图、日历与收藏请求切到同源 BFF。BFF 仅代理显式列入 method/path/query 白名单的既有 API，服务端从 session 取得 access token 后转发到 FastAPI；客户端提供的 Authorization、`x-user-id`，以及 query 或 JSON body 中的 `user_id` 均被拒绝。开关默认关闭，development 模式仍直接使用 `NEXT_PUBLIC_API_URL`。
 
 当前测试与启动方式见 [开发指南](DEVELOPMENT.md)。
 

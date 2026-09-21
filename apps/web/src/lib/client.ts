@@ -12,9 +12,12 @@ import type {
   Scope,
   Trip,
   TripDay,
+  User,
   Visit,
   VisitInput,
 } from "./types";
+import { AuthRequiredError, notifyAuthRequired } from "./auth-events";
+import { webOidcEnabled } from "./auth-mode";
 
 interface Envelope<T> {
   data: T | null;
@@ -23,6 +26,7 @@ interface Envelope<T> {
 }
 export const apiUrl =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const apiBaseUrl = webOidcEnabled ? "/api/bff" : `${apiUrl}/api/v1`;
 const messages: Record<string, string> = {
   AUTH_REQUIRED: "请启用本地开发认证，或配置登录服务。",
   DATABASE_UNAVAILABLE: "数据库暂时无法连接，请稍后重试。",
@@ -40,11 +44,18 @@ async function request<T>(
 ): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${apiUrl}/api/v1${path}`, {
-      ...init,
-      headers: { "Content-Type": "application/json", ...init?.headers },
-    });
-  } catch {
+    for (let attempt = 0; ; attempt += 1) {
+      response = await fetch(`${apiBaseUrl}${path}`, {
+        ...init,
+        headers: { "Content-Type": "application/json", ...init?.headers },
+      });
+      if (!webOidcEnabled || response.status !== 401) break;
+      if (attempt === 0) continue;
+      notifyAuthRequired();
+      throw new AuthRequiredError();
+    }
+  } catch (error) {
+    if (error instanceof AuthRequiredError) throw error;
     throw new Error("无法连接服务，请确认 API 已启动。");
   }
   const body = (await response.json()) as Envelope<T>;
@@ -73,6 +84,7 @@ async function collect<T>(
   return rows;
 }
 export const api = {
+  me: (signal?: AbortSignal) => request<User>("/me", { signal }),
   trips: () =>
     collect((offset) => request<Trip[]>(`/trips?limit=50&offset=${offset}`)),
   trip: (id: string) => request<Trip>(`/trips/${id}`),

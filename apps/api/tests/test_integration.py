@@ -259,9 +259,16 @@ def test_postgis_crud_ownership_and_preserved_visits(database: Session) -> None:
             assert client.get(f"/api/v1/trips/{trip['id']}").status_code == 404
             assert client.get("/api/v1/visits").json()["data"] == []
             assert (
+                client.patch(f"/api/v1/trips/{trip['id']}", json={"title": "越权修改"}).status_code
+                == 404
+            )
+            assert client.delete(f"/api/v1/trips/{trip['id']}").status_code == 404
+            assert (
                 client.patch(f"/api/v1/visits/{visit['id']}", json={"note": "no"}).status_code
                 == 404
             )
+            assert client.delete(f"/api/v1/visits/{visit['id']}").status_code == 404
+            assert client.delete(f"/api/v1/activities/{activity['id']}").status_code == 404
             assert (
                 client.post(
                     "/api/v1/visits",
@@ -274,6 +281,9 @@ def test_postgis_crud_ownership_and_preserved_visits(database: Session) -> None:
                 == 404
             )
             app.dependency_overrides[current_user] = lambda: user
+            assert client.get(f"/api/v1/trips/{trip['id']}").status_code == 200
+            owner_visits = client.get("/api/v1/visits").json()["data"]
+            assert {row["id"] for row in owner_visits} == {visit["id"], second["id"]}
             assert client.delete(f"/api/v1/trips/{trip['id']}").status_code == 200
             visits = client.get("/api/v1/visits").json()["data"]
             assert len(visits) == 2

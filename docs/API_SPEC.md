@@ -87,7 +87,7 @@ Base:
 - 访问其他用户的私有实体返回对应 `*_NOT_FOUND` 404，避免 ID 枚举。
 - 客户端不得提交 `user_id`，业务查询始终使用认证上下文中的本地 User UUID。
 
-阶段 E 的 Next.js 同源 BFF 仅增加 Web 路由 `GET /api/bff/me`。它不属于 FastAPI `/api/v1` 公共契约，也不接受路径、query、Authorization 或 `x-user-id` 身份输入；服务端只从加密 HttpOnly 会话取得 Logto access token，并调用固定的 FastAPI `GET /api/v1/me`。401 时客户端只重试一次，仍失败则进入 `/sign-in`。
+阶段 F 的 Next.js 同源 BFF 使用 `/api/bff/{path}` 承载 Web 已使用的 FastAPI 路由。它不属于 FastAPI `/api/v1` 公共契约，也不是任意反向代理：每个 method、path 和 query key 都必须在服务端白名单中。BFF 不接受客户端 Authorization、`x-user-id`，也拒绝 query 或 JSON body 中任意层级的 `user_id`；服务端只从加密 HttpOnly session 取得 Logto access token。401 时客户端只重试一次，仍失败则进入 `/sign-in`。默认关闭开关时，Web 继续直接使用 `NEXT_PUBLIC_API_URL`。
 
 ```text
 GET    /me

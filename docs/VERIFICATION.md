@@ -84,6 +84,15 @@
 - API Ruff、format、MyPy 通过；Pytest **42 passed、6 skipped**，跳过项需要专用 PostgreSQL，阶段 E 没有后端或数据库修改。
 - 本机仍没有 Docker CLI，无法完成真实 Logto authorization code、过期 token refresh、FastAPI `/me` 和 Logto 全局退出的端到端流程。Roadmap 因此标记为“实现完成（待真实 Logto 验收）”，没有把受控浏览器响应测试宣称为真实身份系统 E2E。
 
+## v0.3 阶段 F — 双用户隔离与非生产切换（2026-09-21）
+
+- `NEXT_PUBLIC_WEB_AUTH_MODE=oidc` 开启时，现有用户、旅行、地点、访问、活动、地图、日历和收藏请求全部改走同源 `/api/bff/*`；关闭时仍直接使用 `NEXT_PUBLIC_API_URL`，默认开发方式未改变。
+- BFF 只开放 Web 当前使用的 method、path 和 query 白名单。客户端 Authorization、`x-user-id`，以及 query 或嵌套 JSON body 中的 `user_id` 均返回 400；服务端只转发 session 中取得的 Bearer token。
+- 所有业务请求的 401 只重试一次，第二次 401 统一进入 `/sign-in`；网络错误保持普通服务不可用提示。TanStack Query 不再继续重试已经确认的认证失效。
+- API Ruff、格式、MyPy 通过。使用仓库内隔离 PostgreSQL 17 + PostGIS 实例执行完整 Pytest：**48 passed**；跨用户回归覆盖已知 Trip/Visit/Activity ID 的读取、修改、删除和关联创建，均返回 404，并验证所有者数据未被改变。
+- Web ESLint、TypeScript、Prettier 通过；默认模式和 OIDC 模式 production build 均通过。使用本机 Chrome 的 Playwright：默认模式 **5 passed、4 skipped**，OIDC/BFF 模式 **8 passed、1 skipped**。OIDC 模式的旅行、地点录入、地图、日历核心流程全部经过同源 BFF mock，另覆盖身份输入拒绝、一次 401 重试和 session 失效跳转。
+- 本机仍没有 Docker CLI，不能创建两个真实 Logto 账户并完成 authorization code 浏览器 E2E。真实双账户 subject 绑定、退出后换号、session/token 实际过期续期仍须按 DEVELOPMENT 和 `infra/logto/README.md` 复验，因此 Roadmap 状态为“实现完成（待真实双账户验收）”。
+
 ## 首版提交前环境整理
 
 - 补充 Node.js / Python 版本文件、EditorConfig、Git 换行规则和 Prettier 忽略配置。

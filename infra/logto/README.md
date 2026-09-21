@@ -30,7 +30,7 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 
 1. 在 **API resources** 新建资源，名称使用 `Tovia API`，API identifier 必须是 `https://api.tovia.local`。不要添加 permission、role 或 organization。
 2. 在 **Applications** 新建 Native 应用，认证方式选择 **Device flow**，名称使用 `Tovia Stage D Token Test`，记下 App ID（即 `client_id`）。Device Flow 是公开客户端，不需要 App Secret。
-3. 在 **User management** 新建一个仅供本地联调的测试用户，设置用户名和密码。
+3. 在 **User management** 新建两个仅供本地联调的测试用户（例如 `tovia-a`、`tovia-b`），分别设置用户名和密码。阶段 D 的单 token 验证只需其中一个；阶段 F 隔离验收必须使用两个账户。
 
 阶段 E 使用时，再在 **Applications** 新建 Traditional Web 应用 `Tovia Web`，配置：
 
@@ -105,6 +105,8 @@ docker compose run --rm api python -m app.commands.bind_identity `
 ```
 
 如果该 Tovia 用户还不存在，先以默认 development 模式启动 API 并请求一次 `GET /api/v1/me`，再执行绑定。
+
+阶段 F 需要为第二个 Logto subject 准备另一个已有的 Tovia User UUID，并执行同一命令完成显式绑定。不得复用默认 UUID，也不得根据 email 自动合并。可先在数据库中创建专用测试 User，再把其 UUID 作为第二条命令的 `--user-id`；命令只创建 identity 映射，不会创建 User。
 
 使用可选 override 重启 Tovia API；它只把 API 切到 OIDC，默认 `docker compose up` 仍然使用 development 认证：
 
