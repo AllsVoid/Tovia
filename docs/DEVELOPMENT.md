@@ -218,6 +218,10 @@ docker compose -f compose.yaml -f infra/logto/compose.tovia-oidc.yaml up --build
 
 服务器必须使用 `APP_ENV=production` 和 `AUTH_MODE=oidc`，不能使用默认 development 身份。替换数据库、Logto 和应用凭据；不要将 `.env` 或 `infra/logto/.env` 放入版本控制。独立 Logto 的端口绑定与完整 Console 配置见 [本地 Logto 指南](../infra/logto/README.md)。
 
+API production 配置拒绝 `AUTH_MODE=disabled`、`development`、示例数据库密码和非 HTTPS issuer；Web 容器在启动 Next.js 前检查 OIDC 开关、HTTPS 公共 URL、App ID/Secret 和至少 32 字符的 cookie secret。API Uvicorn 显式关闭代理头解析，不依赖用户可伪造的 `X-Forwarded-*`；由同机反向代理终止 TLS，并限制应用端口仅供该代理访问。Tovia 使用显式配置的公开 URL，不要把任意客户端转发头加入信任列表。
+
+认证与身份绑定冲突以 JSON 审计事件写入 API 日志，响应 `X-Request-ID` 用于关联请求。事件不包含 token 或原始 Logto subject；生产日志仍须设置受限访问和保留策略。Logto signing key 轮换要保持旧/新公钥并存，验证新 token 后再等待 token 生命周期和 API 5 分钟 JWKS 缓存窗口结束；Traditional Web App Secret 轮换需更新部署 secret 并重启 Web。
+
 ## Development CRUD 验收
 
 通过 Swagger 顺序执行：

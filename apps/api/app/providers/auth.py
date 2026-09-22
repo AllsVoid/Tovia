@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from functools import lru_cache
-import logging
 from typing import Any, Protocol
 from uuid import UUID
 
 import jwt
-from jwt import PyJWK, PyJWKClient, PyJWTError
+from jwt import PyJWK, PyJWKClient, PyJWKClientConnectionError, PyJWTError
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.audit import audit_auth_event
 from app.config import Settings, get_settings
 from app.errors import DomainError
 from app.models import User
@@ -16,7 +16,6 @@ from app.repositories.identity import IdentityRepository
 
 OIDC_PROVIDER = "logto"
 OIDC_ALGORITHMS = ("ES384", "RS256")
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +72,9 @@ class OidcAuthProvider:
 
     def authenticate(self, credential: AuthCredential | None) -> AuthPrincipal:
         if credential is None or credential.scheme.lower() != "bearer" or not credential.token:
+            audit_auth_event(
+                "auth.authentication", "denied", provider=OIDC_PROVIDER, reason="missing_bearer"
+            )
             raise DomainError("AUTH_REQUIRED", "Bearer access token is required", 401)
 
         try:
@@ -86,15 +88,36 @@ class OidcAuthProvider:
                 leeway=self.clock_skew_seconds,
                 options={"require": ["exp", "iss", "aud", "sub"]},
             )
+        except PyJWKClientConnectionError as exc:
+            audit_auth_event(
+                "auth.authentication",
+                "unavailable",
+                provider=OIDC_PROVIDER,
+                reason="jwks_unavailable",
+            )
+            raise DomainError(
+                "AUTH_PROVIDER_UNAVAILABLE", "Authentication provider is unavailable", 503
+            ) from exc
         except (PyJWTError, ValueError) as exc:
-            logger.warning("OIDC token diagnostic: %s", exc)
+            audit_auth_event(
+                "auth.authentication", "denied", provider=OIDC_PROVIDER, reason="invalid_token"
+            )
             raise DomainError("AUTH_REQUIRED", "Invalid or expired access token", 401) from exc
 
         subject = claims["sub"]
         if not isinstance(subject, str) or not subject:
+            audit_auth_event(
+                "auth.authentication", "denied", provider=OIDC_PROVIDER, reason="invalid_subject"
+            )
             raise DomainError("AUTH_REQUIRED", "Invalid or expired access token", 401)
         identity = self.repository.find(OIDC_PROVIDER, subject)
         if identity is None:
+            audit_auth_event(
+                "auth.authentication",
+                "denied",
+                provider=OIDC_PROVIDER,
+                reason="identity_unlinked",
+            )
             raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
         return AuthPrincipal(user_id=identity.user_id, provider=OIDC_PROVIDER, subject=subject)
 
@@ -134,6 +157,19 @@ def resolve_user(session: Session, credential: AuthCredential | None = None) -> 
         principal = provider.authenticate(credential)
         user = session.get(User, principal.user_id)
         if user is None:
+            audit_auth_event(
+                "auth.authentication",
+                "denied",
+                provider=principal.provider,
+                reason="local_user_missing",
+                user_id=str(principal.user_id),
+            )
             raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
+        audit_auth_event(
+            "auth.authentication",
+            "succeeded",
+            provider=principal.provider,
+            user_id=str(principal.user_id),
+        )
         return user
     raise DomainError("AUTH_REQUIRED", "Authentication provider is not configured", 401)

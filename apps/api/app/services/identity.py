@@ -1,5 +1,6 @@
 from sqlalchemy.exc import IntegrityError
 
+from app.audit import audit_auth_event
 from app.errors import DomainError
 from app.models import UserIdentity
 from app.repositories.identity import IdentityRepository
@@ -37,6 +38,14 @@ class IdentityService:
     @staticmethod
     def _resolve_existing(existing: UserIdentity, payload: UserIdentityBind) -> UserIdentity:
         if existing.user_id != payload.user_id:
+            audit_auth_event(
+                "auth.identity_binding",
+                "conflict",
+                provider=payload.provider,
+                requested_user_id=str(payload.user_id),
+                existing_user_id=str(existing.user_id),
+                reason="subject_already_bound",
+            )
             raise DomainError(
                 "IDENTITY_CONFLICT",
                 "Identity is already bound to another user",

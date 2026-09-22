@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
@@ -7,7 +9,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from fastapi.testclient import TestClient
-from jwt import PyJWK
+from jwt import PyJWK, PyJWKClientConnectionError
 from jwt.algorithms import ECAlgorithm, RSAAlgorithm
 
 from app.config import Settings, get_settings
@@ -150,6 +152,7 @@ def test_bearer_header_authenticates_api_request(
     monkeypatch: pytest.MonkeyPatch,
     local_signing_keys: tuple[rsa.RSAPrivateKey, SigningKeyResolver],
     valid_access_token: str,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     _, signing_keys = local_signing_keys
     timestamp = datetime.now(UTC)
@@ -175,16 +178,42 @@ def test_bearer_header_authenticates_api_request(
     get_settings.cache_clear()
     app.dependency_overrides[get_session] = lambda: session
     try:
-        with TestClient(app) as client:
+        with caplog.at_level(logging.INFO, logger="tovia.audit"), TestClient(app) as client:
             response = client.get(
                 "/api/v1/me",
                 headers={"Authorization": f"Bearer {valid_access_token}"},
             )
         assert response.status_code == 200
         assert response.json()["data"]["id"] == str(user.id)
+        assert response.headers["x-request-id"]
+        event = next(
+            json.loads(record.message)
+            for record in caplog.records
+            if record.name == "tovia.audit" and '"event":"auth.authentication"' in record.message
+        )
+        assert event["outcome"] == "succeeded"
+        assert event["provider"] == "logto"
+        assert event["user_id"] == str(user.id)
+        assert event["request_id"] == response.headers["x-request-id"]
+        assert valid_access_token not in caplog.text
     finally:
         app.dependency_overrides.clear()
         get_settings.cache_clear()
+
+
+def test_jwks_outage_fails_closed_as_service_unavailable(
+    valid_access_token: str,
+) -> None:
+    class UnavailableSigningKeys:
+        def get_signing_key_from_jwt(self, token: str) -> PyJWK:
+            raise PyJWKClientConnectionError("upstream details must not escape")
+
+    auth = provider(UnavailableSigningKeys(), identity=None)
+    with pytest.raises(DomainError) as error:
+        auth.authenticate(AuthCredential("Bearer", valid_access_token))
+    assert error.value.code == "AUTH_PROVIDER_UNAVAILABLE"
+    assert error.value.status_code == 503
+    assert "upstream details" not in error.value.message
 
 
 @pytest.mark.parametrize(
@@ -199,15 +228,19 @@ def test_bearer_header_authenticates_api_request(
 def test_invalid_standard_claims_are_rejected(
     local_signing_keys: tuple[rsa.RSAPrivateKey, SigningKeyResolver],
     claim_overrides: dict[str, Any],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     private_key, signing_keys = local_signing_keys
     auth = provider(signing_keys, identity=None)
 
-    assert_auth_required(
-        lambda: auth.authenticate(
-            AuthCredential("Bearer", access_token(private_key, **claim_overrides))
-        )
-    )
+    token = access_token(private_key, **claim_overrides)
+    with caplog.at_level(logging.INFO, logger="tovia.audit"):
+        assert_auth_required(lambda: auth.authenticate(AuthCredential("Bearer", token)))
+    event = json.loads(caplog.records[-1].message)
+    assert event["event"] == "auth.authentication"
+    assert event["outcome"] == "denied"
+    assert event["reason"] == "invalid_token"
+    assert token not in caplog.text
 
 
 def test_unknown_identity_is_not_registered(

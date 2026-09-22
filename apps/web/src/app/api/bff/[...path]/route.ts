@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { getAccessToken } from "@logto/next/server-actions";
 import type { NextRequest } from "next/server";
 import { webOidcEnabled } from "@/lib/auth-mode";
@@ -81,10 +82,18 @@ const rules: Rule[] = [
   },
 ];
 
-const jsonError = (status: number, code: string, message: string) =>
+const jsonError = (
+  status: number,
+  code: string,
+  message: string,
+  requestId = randomUUID(),
+) =>
   Response.json(
     { data: null, meta: {}, error: { code, message } },
-    { status, headers: { "Cache-Control": "no-store" } },
+    {
+      status,
+      headers: { "Cache-Control": "no-store", "X-Request-ID": requestId },
+    },
   );
 
 function isIdentityKey(key: string): boolean {
@@ -104,8 +113,9 @@ async function proxy(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> },
 ) {
+  const requestId = randomUUID();
   if (!webOidcEnabled) {
-    return jsonError(404, "NOT_FOUND", "Web OIDC is disabled");
+    return jsonError(404, "NOT_FOUND", "Web OIDC is disabled", requestId);
   }
   if (
     request.headers.has("authorization") ||
@@ -115,6 +125,7 @@ async function proxy(
       400,
       "IDENTITY_INPUT_REJECTED",
       "Identity credentials are managed by the server session",
+      requestId,
     );
   }
 
@@ -132,10 +143,16 @@ async function proxy(
         400,
         "IDENTITY_INPUT_REJECTED",
         "Identity credentials are managed by the server session",
+        requestId,
       );
     }
     if (!rule.query?.has(key)) {
-      return jsonError(400, "QUERY_REJECTED", "Query parameter is not allowed");
+      return jsonError(
+        400,
+        "QUERY_REJECTED",
+        "Query parameter is not allowed",
+        requestId,
+      );
     }
   }
 
@@ -143,7 +160,12 @@ async function proxy(
   if (request.method === "POST" || request.method === "PATCH") {
     body = await request.text();
     if (body.length > 1_000_000) {
-      return jsonError(413, "PAYLOAD_TOO_LARGE", "Request body is too large");
+      return jsonError(
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "Request body is too large",
+        requestId,
+      );
     }
     if (body) {
       let payload: unknown;
@@ -154,6 +176,7 @@ async function proxy(
           400,
           "INVALID_JSON",
           "Request body must be valid JSON",
+          requestId,
         );
       }
       if (hasIdentityInput(payload)) {
@@ -161,6 +184,7 @@ async function proxy(
           400,
           "IDENTITY_INPUT_REJECTED",
           "Identity credentials are managed by the server session",
+          requestId,
         );
       }
     }
@@ -171,21 +195,32 @@ async function proxy(
   try {
     token = await getAccessToken(getLogtoConfig(), getLogtoApiResource());
     apiUrl = getToviaApiUrl();
-    const [header, payload] = token.split(".");
-    console.info("OIDC token diagnostic", {
-      header: JSON.parse(Buffer.from(header, "base64url").toString("utf8")),
-      payload: JSON.parse(Buffer.from(payload, "base64url").toString("utf8")),
-    });
   } catch (error) {
     if (error instanceof WebAuthConfigError) {
+      console.warn(
+        JSON.stringify({
+          event: "auth.session",
+          outcome: "unavailable",
+          reason: "configuration_missing",
+          request_id: requestId,
+        }),
+      );
       return jsonError(
         503,
         "AUTH_UNAVAILABLE",
         "Web authentication is not configured",
+        requestId,
       );
     }
-    console.error("OIDC session diagnostic", error);
-    return jsonError(401, "AUTH_REQUIRED", "Sign in is required");
+    console.warn(
+      JSON.stringify({
+        event: "auth.session",
+        outcome: "denied",
+        reason: "session_unavailable",
+        request_id: requestId,
+      }),
+    );
+    return jsonError(401, "AUTH_REQUIRED", "Sign in is required", requestId);
   }
 
   let upstream: Response;
@@ -205,7 +240,12 @@ async function proxy(
       },
     );
   } catch {
-    return jsonError(502, "API_UNAVAILABLE", "Tovia API is unavailable");
+    return jsonError(
+      502,
+      "API_UNAVAILABLE",
+      "Tovia API is unavailable",
+      requestId,
+    );
   }
 
   return new Response(await upstream.arrayBuffer(), {
@@ -214,6 +254,7 @@ async function proxy(
       "Cache-Control": "no-store",
       "Content-Type":
         upstream.headers.get("content-type") ?? "application/json",
+      "X-Request-ID": upstream.headers.get("x-request-id") ?? requestId,
     },
   });
 }

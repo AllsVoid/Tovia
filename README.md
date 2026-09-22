@@ -129,9 +129,37 @@ CORS_ORIGINS=["https://travel.example.com"]
 
 关闭 Web OIDC 时，`API_PUBLIC_URL` 应是浏览器可访问的 API HTTPS 地址。启用 Web OIDC/BFF 时，Web 服务端通过内部 `TOVIA_API_URL=http://api:8000` 访问 API；浏览器侧 API 地址通常不参与业务请求。
 
-`WEB_BIND_ADDRESS`、`API_BIND_ADDRESS` 和对应的 `*_HOST_PORT` 控制宿主机端口映射。与同机反向代理配合时，建议保留 `127.0.0.1` 绑定，由代理处理 HTTPS 和公网入口；数据库和 Redis 也默认只绑定 loopback，不要直接暴露公网。反向代理应将 Web 域名转发到 Web 端口，将 API 域名转发到 API 端口，并启用 HTTPS、正确传递原始 Host/协议头及 WebSocket（如有需要）。Compose 不会替你配置 DNS、TLS 或反向代理。
+`WEB_BIND_ADDRESS`、`API_BIND_ADDRESS` 和对应的 `*_HOST_PORT` 控制宿主机端口映射。与同机反向代理配合时，建议保留 `127.0.0.1` 绑定，由代理处理 HTTPS 和公网入口；数据库和 Redis 也默认只绑定 loopback，不要直接暴露公网。反向代理应将 Web 域名转发到 Web 端口，将 API 域名转发到 API 端口，并启用 HTTPS、设置固定的 Host/协议头及 WebSocket（如有需要）。API 容器不信任 `X-Forwarded-*` 头；不要改成信任任意来源，应用使用 `.env` 中配置的公开 URL。Compose 不会替你配置 DNS、TLS 或反向代理。
 
 如果服务器启用 Logto 登录，`LOGTO_ENDPOINT` 和 `OIDC_ISSUER` 必须使用外部可访问的认证域名，且 issuer 必须与 token 的 `iss` 完全一致；通常是 `https://auth.example.com` 和 `https://auth.example.com/oidc`。Traditional Web 应用的 Redirect URI、登出回调也要改成生产 Web 域名（例如 `https://travel.example.com/callback` 与 `https://travel.example.com/`）。`LOGTO_BASE_URL` 设为 Web HTTPS 地址，`LOGTO_COOKIE_SECRET` 使用新的随机值，`LOGTO_APP_SECRET` 使用生产 Logto 应用的密钥；`OIDC_AUDIENCE` 继续与 API Resource identifier 相同。若 Logto 与 Tovia Compose 共享网络，`OIDC_JWKS_URL` 可继续用 `http://logto:3001/oidc/jwks`；否则需改成 API 容器可以访问的 JWKS 地址。Logto 自身使用独立的 `infra/logto/.env`，其 `LOGTO_ENDPOINT`、`LOGTO_ADMIN_ENDPOINT` 和绑定端口也须按域名及反向代理调整，并保护 Console 管理入口。
+
+生产 API 只接受 `APP_ENV=production` 与 `AUTH_MODE=oidc`，要求 HTTPS issuer 和非示例数据库密码；生产 Web 也必须启用 OIDC 并提供 HTTPS Logto/Web 地址及完整密钥。配置不满足时服务启动失败。OIDC 凭证无效或过期返回 401；Logto/JWKS 暂时不可用返回 503，不会切换到开发用户。API 输出 JSON 认证审计事件（成功、拒绝、provider 不可用、身份绑定冲突），响应头 `X-Request-ID` 可用于关联排查。日志不记录 bearer token 或原始 subject；请限制日志访问并按部署的数据保留政策管理。
+
+Logto 应用密钥轮换时，先在 Logto 创建/轮换密钥并更新部署 secret，再重启 Web；确认登录和登出正常后撤销旧密钥。签名密钥应先让新旧公钥在 JWKS 中并存，验证新签发 token 后，再等最长 access-token 有效期和 API 5 分钟 JWKS 缓存窗口过去后撤销旧密钥。API 会对未知 `kid` 重新读取 JWKS；切勿在重叠验证完成前移除旧公钥。
+
+部署需定期备份 Tovia PostgreSQL 数据库，加密后异地存放，并在独立临时数据库演练恢复。以下 PowerShell 示例从数据库容器导出 PostgreSQL custom-format 备份，再复制到主机；`infra/backups/` 不会提交到 Git：
+
+```powershell
+New-Item -ItemType Directory -Force infra/backups | Out-Null
+$backupFile = "infra/backups/tovia-$(Get-Date -Format 'yyyyMMdd-HHmmss').dump"
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --file=/tmp/tovia.dump'
+docker compose cp db:/tmp/tovia.dump $backupFile
+docker compose exec -T db rm -f /tmp/tovia.dump
+Get-FileHash $backupFile -Algorithm SHA256
+```
+
+恢复演练必须使用临时数据库，不能直接覆盖运行中的生产库：
+
+```powershell
+docker compose cp $backupFile db:/tmp/tovia-restore-check.dump
+docker compose exec -T db sh -c 'createdb -U "$POSTGRES_USER" tovia_restore_check'
+docker compose exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d tovia_restore_check --no-owner --exit-on-error /tmp/tovia-restore-check.dump'
+docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d tovia_restore_check -c "SELECT PostGIS_Version(); SELECT version_num FROM alembic_version;"'
+docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" tovia_restore_check'
+docker compose exec -T db rm -f /tmp/tovia-restore-check.dump
+```
+
+保留每次部署所用的应用镜像/代码版本、Compose 配置和受控 secret 版本。认证配置或应用回滚时，恢复上一已验证版本与对应配置；OIDC 阶段不改写 User UUID 或旅行数据外键。发生数据库损坏时先停止 API 写入，从已验证备份恢复到新数据库/卷，检查 PostGIS 和 Alembic revision，再切换连接并检查 `/health`。Logto 的身份数据库须独立备份和恢复，步骤见[Logto 运维说明](infra/logto/README.md)。
 
 ## 项目结构
 

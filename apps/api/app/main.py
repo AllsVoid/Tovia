@@ -1,6 +1,7 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -9,7 +10,9 @@ from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette.exceptions import HTTPException
+from starlette.responses import Response
 
+from app.audit import reset_request_id, set_request_id
 from app.config import get_settings
 from app.db import engine
 from app.errors import DomainError
@@ -31,6 +34,7 @@ app = FastAPI(
     lifespan=lifespan,
     responses={
         401: {"model": Envelope[None]},
+        503: {"model": Envelope[None]},
         404: {"model": Envelope[None]},
         409: {"model": Envelope[None]},
         422: {"model": Envelope[None]},
@@ -45,6 +49,20 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(core.router)
 app.include_router(explore.router)
+
+
+@app.middleware("http")
+async def request_id_middleware(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    request_id = uuid4().hex
+    token = set_request_id(request_id)
+    try:
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+    finally:
+        reset_request_id(token)
 
 
 def error_response(status: int, code: str, message: str) -> JSONResponse:

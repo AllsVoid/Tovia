@@ -1,3 +1,5 @@
+import json
+import logging
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -51,7 +53,7 @@ def test_rebinding_same_identity_to_same_user_is_idempotent() -> None:
     repository.save.assert_not_called()
 
 
-def test_identity_cannot_be_rebound_to_another_user() -> None:
+def test_identity_cannot_be_rebound_to_another_user(caplog: pytest.LogCaptureFixture) -> None:
     binding = payload()
     repository = MagicMock(spec=IdentityRepository)
     repository.get_user.return_value = User(id=binding.user_id, display_name="other")
@@ -62,10 +64,15 @@ def test_identity_cannot_be_rebound_to_another_user() -> None:
         provider_subject=binding.provider_subject,
     )
 
-    with pytest.raises(DomainError) as error:
+    with caplog.at_level(logging.INFO, logger="tovia.audit"), pytest.raises(DomainError) as error:
         IdentityService(repository).bind(binding)
     assert error.value.code == "IDENTITY_CONFLICT"
     assert error.value.status_code == 409
+    event = json.loads(caplog.records[-1].message)
+    assert event["event"] == "auth.identity_binding"
+    assert event["outcome"] == "conflict"
+    assert event["provider"] == "logto"
+    assert binding.provider_subject not in caplog.text
 
 
 def test_binding_does_not_create_unknown_user() -> None:

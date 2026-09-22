@@ -94,6 +94,7 @@ test.describe("optional web OIDC", () => {
       "/api/bff/me?user_id=00000000-0000-4000-8000-000000000001",
     );
     expect(queryResponse.status()).toBe(400);
+    expect(queryResponse.headers()["x-request-id"]).toBeTruthy();
     expect((await queryResponse.json()).error.code).toBe(
       "IDENTITY_INPUT_REJECTED",
     );

@@ -223,4 +223,4 @@ Logto 只负责凭证、OIDC 登录和会话。Tovia 继续拥有本地 `User`�
 | D 可选的 Logto 开发环境 | 实现完成（待运行验收） | 2026-09-20 | 独立 Compose project、数据库用户与持久卷；固定 Logto/PostgreSQL 镜像；Device Flow token 与阶段 C 联调步骤；默认 Compose 静态回归 | 本机无 Docker，未执行容器启动与真实 token 端到端验证，需在具备 Docker 的环境按 README 复验 |
 | E 最小 Web 登录与 BFF | 实现完成（待真实 Logto 验收） | 2026-09-21 | 官方 Next.js SDK、加密 HttpOnly session、登录/callback/退出、固定 `/api/bff/me`、一次 401 重试与身份输入拒绝测试 | 本机无 Docker，真实 Logto 登录、token refresh 和退出仍需按 DEVELOPMENT 复验 |
 | F 双用户隔离与非生产切换 | 实现完成（待真实双账户验收） | 2026-09-21 | 全部现有 Web API 切到白名单 BFF；默认/OIDC Playwright 5/8 passed；真实 PostgreSQL/PostGIS Pytest 48 passed，覆盖跨用户读改删与 ID 隔离 | 本机无 Docker，尚未执行真实 Logto 双账户和真实身份浏览器 E2E；按 DEVELOPMENT 与 infra/logto/README 复验后方可关闭验收项 |
-| G 生产启用与最小运维闭环 | 未开始 | — | — | — |
+| G 生产启用与最小运维闭环 | 实现完成（待真实环境验收） | 2026-09-22 | production 只允许 OIDC；OIDC issuer 要求 HTTPS；Web production 启动校验 OIDC/HTTPS/密钥；JWKS 连接故障返回 503 且不降级；带 request ID 的 JSON 认证审计；配置与审计单元测试 | 当前环境未安装 Docker，尚未在真实 HTTPS Logto/反向代理部署，未执行数据库备份恢复与应用回滚演练；需在部署环境按运维清单验收 |

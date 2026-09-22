@@ -49,9 +49,53 @@ def test_place_rejects_invalid_geography(changes: dict[str, object]) -> None:
         PlaceCreate.model_validate(payload | changes)
 
 
-def test_development_auth_forbidden_in_production() -> None:
+@pytest.mark.parametrize("auth_mode", ["disabled", "development"])
+def test_non_oidc_auth_forbidden_in_production(auth_mode: str) -> None:
     with pytest.raises(ValidationError):
-        Settings(app_env="production", auth_mode="development", _env_file=None)
+        Settings(app_env="production", auth_mode=auth_mode, _env_file=None)
+
+
+def test_production_oidc_requires_https_issuer() -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            app_env="production",
+            auth_mode="oidc",
+            oidc_issuer="http://auth.example.com/oidc",
+            oidc_audience="https://api.example.com",
+            oidc_jwks_url="http://logto:3001/oidc/jwks",
+            database_url="postgresql+psycopg://tovia:production-secret@db:5432/tovia",
+            _env_file=None,
+        )
+
+
+def test_production_oidc_requires_complete_configuration() -> None:
+    with pytest.raises(ValidationError, match="OIDC authentication requires issuer"):
+        Settings(app_env="production", auth_mode="oidc", _env_file=None)
+
+
+def test_production_oidc_accepts_internal_http_jwks_endpoint() -> None:
+    settings = Settings(
+        app_env="production",
+        auth_mode="oidc",
+        oidc_issuer="https://auth.example.com/oidc",
+        oidc_audience="https://api.example.com",
+        oidc_jwks_url="http://logto:3001/oidc/jwks",
+        database_url="postgresql+psycopg://tovia:production-secret@db:5432/tovia",
+        _env_file=None,
+    )
+    assert settings.auth_mode == "oidc"
+
+
+def test_production_rejects_sample_database_password() -> None:
+    with pytest.raises(ValidationError, match="replace the sample database password"):
+        Settings(
+            app_env="production",
+            auth_mode="oidc",
+            oidc_issuer="https://auth.example.com/oidc",
+            oidc_audience="https://api.example.com",
+            oidc_jwks_url="http://logto:3001/oidc/jwks",
+            _env_file=None,
+        )
 
 
 def test_oidc_configuration_requires_all_endpoints() -> None:
