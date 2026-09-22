@@ -4,7 +4,13 @@ services:
       AUTH_MODE: oidc
       OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:3001/oidc}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-https://api.tovia.local}
-      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://host.docker.internal:3001/oidc/jwks}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://logto:3001/oidc/jwks}
       OIDC_CLOCK_SKEW_SECONDS: ${OIDC_CLOCK_SKEW_SECONDS:-30}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - logto-network
+
+networks:
+  logto-network:
+    external: true
+    name: tovia-logto_default
