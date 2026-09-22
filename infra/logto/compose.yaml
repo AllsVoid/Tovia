@@ -28,8 +28,8 @@ services:
       ENDPOINT: ${LOGTO_ENDPOINT:-http://localhost:3001}
       ADMIN_ENDPOINT: ${LOGTO_ADMIN_ENDPOINT:-http://localhost:3002}
     ports:
-      - "127.0.0.1:3001:3001"
-      - "127.0.0.1:3002:3002"
+      - "${LOGTO_BIND_ADDRESS:-127.0.0.1}:${LOGTO_HOST_PORT:-3001}:3001"
+      - "${LOGTO_BIND_ADDRESS:-127.0.0.1}:${LOGTO_ADMIN_HOST_PORT:-3002}:3002"
     depends_on:
       logto-db:
         condition: service_healthy

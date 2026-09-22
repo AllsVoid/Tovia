@@ -19,6 +19,8 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml up -d
 docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 ```
 
+在服务器上部署时，将 `infra/logto/.env` 中的 `LOGTO_ENDPOINT` 配为公开认证域名（例如 `https://auth.example.com`），将 `LOGTO_ADMIN_ENDPOINT` 配为受控的 Console 域名（例如 `https://console.example.com`）。`LOGTO_BIND_ADDRESS` / `LOGTO_HOST_PORT` / `LOGTO_ADMIN_HOST_PORT` 控制宿主机端口映射。建议服务只绑定 loopback，由反向代理提供 HTTPS，并限制管理入口。Tovia 的 `LOGTO_ENDPOINT` 与 `OIDC_ISSUER` 使用公开认证 endpoint，issuer 默认以 `/oidc` 结尾。
+
 等待 `logto` 和 `logto-db` 都显示 healthy，然后访问：
 
 - Logto Console：<http://localhost:3002>
@@ -121,7 +123,7 @@ Invoke-RestMethod `
   -Headers @{ Authorization = "Bearer $accessToken" }
 ```
 
-预期返回绑定用户；无 token、错误 audience 或未绑定 subject 返回 401。API 容器通过 `host.docker.internal` 读取 JWKS，但仍严格校验 token 中的 localhost issuer。
+预期返回绑定用户；无 token、错误 audience 或未绑定 subject 返回 401。API 与 Logto Compose 通过共享的 `tovia-logto_default` 网络访问 JWKS，默认地址为 `http://logto:3001/oidc/jwks`。部署时 issuer 仍须与 token 的 `iss` 完全匹配；只有 Logto 不在该 Docker 网络时，才将 `OIDC_JWKS_URL` 改成 API 容器可访问的 URL。
 
 恢复默认开发认证：
 

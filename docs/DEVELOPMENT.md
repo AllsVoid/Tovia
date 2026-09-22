@@ -51,7 +51,7 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-另开终端在根目录运行 `npm run dev`。API 从根目录 `.env` 读取配置。Web 的默认 API 地址为 `http://localhost:8000`；本地改址请设置进程环境变量 `NEXT_PUBLIC_API_URL` 或使用 `apps/web/.env.local`。Docker 构建通过 build arg 固定浏览器 API 地址，改址后需重建 Web 镜像。
+另开终端在根目录运行 `npm run dev`。API 从根目录 `.env` 读取配置。Web 的默认 API 地址为 `http://localhost:8000`；本地改址请设置进程环境变量 `NEXT_PUBLIC_API_URL` 或使用 `apps/web/.env.local`。Docker Compose 使用 `API_PUBLIC_URL` 构建浏览器端 API 地址，改址后需重建 Web 镜像；`WEB_PUBLIC_URL` 作为公开 Web origin，并映射到 `LOGTO_BASE_URL`。`WEB_BIND_ADDRESS` / `WEB_HOST_PORT` 和 `API_BIND_ADDRESS` / `API_HOST_PORT` 控制宿主机端口映射。默认绑定 `127.0.0.1`，适合由同机反向代理转发。
 
 ## 完全不使用 Docker（Windows）
 
@@ -171,7 +171,52 @@ BFF 不读取浏览器提供的 Bearer token，也拒绝 `Authorization`、`x-us
 
 阶段 F 双账户验收使用两个独立 Logto 测试用户和两个已有的本地 User UUID。分别执行 `bind_identity`，不要按 email 自动匹配，也不要让两个 subject 指向同一 User。账号 A 创建旅行、访问、活动和收藏后退出，再以账号 B 登录：列表中不得出现 A 的记录；直接访问 A 的已知 ID，以及修改或删除请求均应返回 404。最后切回账号 A，确认数据未被 B 修改。再让浏览器 session 失效，确认业务请求只重试一次并进入 `/sign-in`。完整验收必须连接真实 FastAPI 与专用 PostgreSQL，不能用浏览器 mock 代替。
 
-本地 Logto endpoint 使用 `localhost` 时，建议让 Web 运行在宿主机；容器内的 `localhost` 不指向 Logto。具有统一可访问域名的部署环境可通过 Compose 给 Web 注入相同变量。
+本地 Logto endpoint 使用 `localhost` 时，建议让 Web 运行在宿主机；容器内的 `localhost` 不指向 Logto。服务器部署需给 Web 注入外部可访问的 Logto endpoint 和公开 Web base URL，详细变量见下一节。
+
+## 服务器部署配置
+
+Compose 默认值面向本机开发。部署到服务器时，在根目录 `.env` 设置用户实际访问的域名和端口，并在反向代理上配置 HTTPS、DNS 与转发规则。仓库没有内置反向代理或自动申请 TLS。
+
+例如 Web 和 API 使用不同子域名：
+
+```dotenv
+APP_ENV=production
+AUTH_MODE=oidc
+WEB_PUBLIC_URL=https://travel.example.com
+API_PUBLIC_URL=https://api.example.com
+CORS_ORIGINS=["https://travel.example.com"]
+WEB_BIND_ADDRESS=127.0.0.1
+WEB_HOST_PORT=3000
+API_BIND_ADDRESS=127.0.0.1
+API_HOST_PORT=8000
+POSTGRES_BIND_ADDRESS=127.0.0.1
+POSTGRES_HOST_PORT=5432
+REDIS_BIND_ADDRESS=127.0.0.1
+REDIS_HOST_PORT=6379
+NEXT_PUBLIC_WEB_AUTH_MODE=oidc
+LOGTO_ENDPOINT=https://auth.example.com
+LOGTO_APP_ID=<traditional-web-app-id>
+LOGTO_APP_SECRET=<secret>
+LOGTO_BASE_URL=https://travel.example.com
+LOGTO_COOKIE_SECRET=<至少 32 个随机字符>
+LOGTO_API_RESOURCE=https://api.example.com
+OIDC_ISSUER=https://auth.example.com/oidc
+OIDC_AUDIENCE=https://api.example.com
+OIDC_JWKS_URL=http://logto:3001/oidc/jwks
+```
+
+把 `example.com` 替换为自己的域名。`API_PUBLIC_URL` 是 Web 构建时写入浏览器的 API 地址，使用独立 API 域名时，反向代理需要将该域名转发到 API 的宿主机端口，并且 `CORS_ORIGINS` 必须包含 Web 的精确 origin。启用 OIDC/BFF 时，Web 服务端使用内部 `TOVIA_API_URL=http://api:8000` 访问 API；API 可保持 loopback 绑定，仅供反向代理或同机服务调用。
+
+`LOGTO_ENDPOINT` 和 `OIDC_ISSUER` 必须指向同一个 Logto issuer（默认在 endpoint 后加 `/oidc`）。Logto 独立 Compose 使用 `infra/logto/.env`：将 `LOGTO_ENDPOINT` 设为公开认证域名，例如 `https://auth.example.com`；`LOGTO_ADMIN_ENDPOINT` 可使用单独的 Console 域名，例如 `https://console.example.com`，并在代理层限制管理入口。然后在 Console 的 `Tovia Web` 应用登记 `https://travel.example.com/callback` 和 `https://travel.example.com/`。Logto API Resource identifier 必须与 `OIDC_AUDIENCE` / `LOGTO_API_RESOURCE` 完全相同。若 Logto 与 Tovia API 使用本仓库的 Compose 网络，`OIDC_JWKS_URL=http://logto:3001/oidc/jwks` 使用内部容器地址即可，issuer 仍用公开 URL；Logto 在外部时，把 JWKS URL 改成 API 容器可访问的地址。
+
+先启动 Logto Compose，再启动叠加 OIDC 配置的 Tovia 服务：
+
+```powershell
+docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml up -d
+docker compose -f compose.yaml -f infra/logto/compose.tovia-oidc.yaml up --build -d
+```
+
+服务器必须使用 `APP_ENV=production` 和 `AUTH_MODE=oidc`，不能使用默认 development 身份。替换数据库、Logto 和应用凭据；不要将 `.env` 或 `infra/logto/.env` 放入版本控制。独立 Logto 的端口绑定与完整 Console 配置见 [本地 Logto 指南](../infra/logto/README.md)。
 
 ## Development CRUD 验收
 

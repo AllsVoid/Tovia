@@ -6,7 +6,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-tovia}
       POSTGRES_USER: ${POSTGRES_USER:-tovia}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tovia_local_only}
-    ports: ["127.0.0.1:5432:5432"]
+    ports:
+      - "${POSTGRES_BIND_ADDRESS:-127.0.0.1}:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes: ["postgres_data:/var/lib/postgresql/data"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -15,7 +16,8 @@ services:
       retries: 20
   redis:
     image: redis:7-alpine
-    ports: ["127.0.0.1:6379:6379"]
+    ports:
+      - "${REDIS_BIND_ADDRESS:-127.0.0.1}:${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -37,11 +39,18 @@ services:
       AUTH_MODE: ${AUTH_MODE:-development}
       DEV_USER_ID: ${DEV_USER_ID:-00000000-0000-4000-8000-000000000001}
       CORS_ORIGINS: '${CORS_ORIGINS:-["http://localhost:3000"]}'
-    ports: ["127.0.0.1:8000:8000"]
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_HOST_PORT:-8000}:8000"
     depends_on:
       migrate: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)",
+        ]
       interval: 10s
       timeout: 6s
       retries: 10
@@ -50,7 +59,7 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL:-${NEXT_PUBLIC_API_URL:-http://localhost:8000}}
         NEXT_PUBLIC_WEB_AUTH_MODE: ${NEXT_PUBLIC_WEB_AUTH_MODE:-development}
     environment:
       NEXT_PUBLIC_WEB_AUTH_MODE: ${NEXT_PUBLIC_WEB_AUTH_MODE:-development}
@@ -58,10 +67,11 @@ services:
       LOGTO_ENDPOINT: ${LOGTO_ENDPOINT:-}
       LOGTO_APP_ID: ${LOGTO_APP_ID:-}
       LOGTO_APP_SECRET: ${LOGTO_APP_SECRET:-}
-      LOGTO_BASE_URL: ${LOGTO_BASE_URL:-}
+      LOGTO_BASE_URL: ${LOGTO_BASE_URL:-${WEB_PUBLIC_URL:-http://localhost:3000}}
       LOGTO_COOKIE_SECRET: ${LOGTO_COOKIE_SECRET:-}
       LOGTO_API_RESOURCE: ${LOGTO_API_RESOURCE:-}
-    ports: ["127.0.0.1:3000:3000"]
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_HOST_PORT:-3000}:3000"
     depends_on:
       api: { condition: service_healthy }
 volumes:
