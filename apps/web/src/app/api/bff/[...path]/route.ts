@@ -18,6 +18,9 @@ type Rule = {
 const pageQuery = new Set(["limit", "offset"]);
 const rules: Rule[] = [
   { method: "GET", path: /^me$/ },
+  { method: "PATCH", path: /^me$/ },
+  { method: "GET", path: /^me\/export$/ },
+  { method: "POST", path: /^me\/delete$/ },
   { method: "GET", path: /^trips$/, query: pageQuery },
   { method: "POST", path: /^trips$/ },
   { method: "GET", path: /^trips\/[a-zA-Z0-9_-]+$/ },
@@ -36,7 +39,9 @@ const rules: Rule[] = [
   },
   { method: "POST", path: /^trips\/[a-zA-Z0-9_-]+\/activities$/ },
   { method: "DELETE", path: /^days\/[a-zA-Z0-9_-]+$/ },
+  { method: "PATCH", path: /^days\/[a-zA-Z0-9_-]+$/ },
   { method: "DELETE", path: /^activities\/[a-zA-Z0-9_-]+$/ },
+  { method: "PATCH", path: /^activities\/[a-zA-Z0-9_-]+$/ },
   {
     method: "GET",
     path: /^places\/search$/,
@@ -57,6 +62,7 @@ const rules: Rule[] = [
   },
   { method: "POST", path: /^visits$/ },
   { method: "DELETE", path: /^visits\/[a-zA-Z0-9_-]+$/ },
+  { method: "PATCH", path: /^visits\/[a-zA-Z0-9_-]+$/ },
   {
     method: "GET",
     path: /^map\/places$/,

@@ -1,5 +1,4 @@
 from datetime import date as Date
-from datetime import datetime as Datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal, Self
 from uuid import UUID
@@ -42,8 +41,8 @@ class UserRead(Output):
     avatar_url: str | None
     timezone: str
     locale: str
-    created_at: Datetime
-    updated_at: Datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class TripCreate(Input):
@@ -77,8 +76,8 @@ class TripRead(Output):
     timezone: str
     summary: str | None
     visibility: str
-    created_at: Datetime
-    updated_at: Datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class DayCreate(Input):
@@ -115,7 +114,7 @@ class PlaceCreate(Input):
 
 class PlaceRead(PlaceCreate):
     id: UUID
-    created_at: Datetime
+    created_at: AwareDatetime
 
 
 class VisitCreate(Input):
@@ -142,12 +141,12 @@ class VisitRead(Output):
     trip_id: UUID | None
     trip_day_id: UUID | None
     place_id: UUID
-    visited_at: Datetime
-    ended_at: Datetime | None
+    visited_at: AwareDatetime
+    ended_at: AwareDatetime | None
     source: VisitSource
     confidence: Decimal | None
     note: str | None
-    created_at: Datetime
+    created_at: AwareDatetime
 
 
 class ActivityCreate(Input):
@@ -176,14 +175,14 @@ class ActivityRead(Output):
     place_id: UUID | None
     type: ActivityType
     title: str
-    start_at: Datetime | None
-    end_at: Datetime | None
+    start_at: AwareDatetime | None
+    end_at: AwareDatetime | None
     status: ActivityStatus
     sort_order: int
     note: str | None
     source: VisitSource
-    created_at: Datetime
-    updated_at: Datetime
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 # PATCH fields default to None only to permit omission. The service merges provided
@@ -231,3 +230,7 @@ class UserPatch(Input):
     display_name: str | None = None
     timezone: Timezone | None = None
     locale: str | None = None
+
+
+class AccountDelete(Input):
+    confirmation: Literal["DELETE"]

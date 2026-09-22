@@ -8,10 +8,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useState } from "react";
+import { inputToInstant, instantToLocalInput } from "@/lib/dates";
 import {
   api,
+  type Activity,
   type Place,
   type Trip,
+  type TripDay,
   type TripStatus,
   type Visit,
 } from "@/lib/api";
@@ -22,29 +25,321 @@ import { QueryError } from "./query-error";
 import { RecordPlace } from "./record-place";
 
 function VisitRow({ visit, onDelete }: { visit: Visit; onDelete: () => void }) {
+  const client = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [tripId, setTripId] = useState(visit.trip_id ?? "");
+  const [tripDayId, setTripDayId] = useState(visit.trip_day_id ?? "");
+  const trips = useQuery({ queryKey: ["trips"], queryFn: () => api.trips() });
+  const days = useQuery({
+    queryKey: ["days", tripId],
+    queryFn: () => api.days(tripId),
+    enabled: Boolean(tripId),
+  });
+  const update = useMutation({
+    mutationFn: (form: FormData) => {
+      const selectedTrip = String(form.get("trip")) || null;
+      const start = String(form.get("visited_at"));
+      const end = String(form.get("ended_at"));
+      return api.updateVisit(visit.id, {
+        trip_id: selectedTrip,
+        trip_day_id: selectedTrip ? tripDayId || null : null,
+        visited_at: inputToInstant(start),
+        ended_at: end ? inputToInstant(end) : null,
+        note: String(form.get("note")).trim() || null,
+      });
+    },
+    onSuccess: async () => {
+      await refreshTravel(client);
+      setEditing(false);
+    },
+  });
   const place = useQuery({
     queryKey: ["place", visit.place_id],
     queryFn: () => api.place(visit.place_id),
   });
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-border py-4">
-      <div>
-        <Link className="text-link" href={`/?place=${visit.place_id}`}>
-          {place.data?.canonical_name ?? "查看地点"}
-        </Link>
-        <p className="muted mt-1">
-          {formatInstant(visit.visited_at, place.data?.timezone ?? "UTC")}
-          {visit.ended_at &&
-            ` → ${formatInstant(visit.ended_at, place.data?.timezone ?? "UTC")}`}
-        </p>
-        {visit.note && (
-          <p className="mt-2 text-sm whitespace-pre-wrap">{visit.note}</p>
-        )}
+    <div className="border-b border-border py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <Link className="text-link" href={`/?place=${visit.place_id}`}>
+            {place.data?.canonical_name ?? "查看地点"}
+          </Link>
+          <p className="muted mt-1">
+            {formatInstant(visit.visited_at, place.data?.timezone ?? "UTC")}
+            {visit.ended_at &&
+              ` → ${formatInstant(visit.ended_at, place.data?.timezone ?? "UTC")}`}
+          </p>
+          {visit.note && (
+            <p className="mt-2 text-sm whitespace-pre-wrap">{visit.note}</p>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <button className="text-button" onClick={() => setEditing(!editing)}>
+            {editing ? "取消编辑" : "编辑"}
+          </button>
+          <button className="text-button" onClick={onDelete}>
+            删除
+          </button>
+        </div>
       </div>
-      <button className="text-button" onClick={onDelete}>
-        删除
-      </button>
+      {editing && (
+        <form
+          className="mt-4 space-y-3 rounded-lg bg-muted p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            update.mutate(new FormData(event.currentTarget));
+          }}
+        >
+          <div className="form-grid">
+            <label className="field">
+              所属旅行
+              <select
+                name="trip"
+                value={tripId}
+                onChange={(event) => {
+                  setTripId(event.target.value);
+                  setTripDayId("");
+                }}
+              >
+                <option value="">独立访问</option>
+                {trips.data?.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              所属旅行日
+              <select
+                name="trip_day"
+                value={tripDayId}
+                onChange={(event) => setTripDayId(event.target.value)}
+                disabled={!tripId}
+              >
+                <option value="">不关联旅行日</option>
+                {days.data?.map((day) => (
+                  <option key={day.id} value={day.id}>
+                    {day.date} · {day.title || "自由探索"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              抵达时间（设备时区）
+              <input
+                name="visited_at"
+                type="datetime-local"
+                required
+                defaultValue={instantToLocalInput(visit.visited_at)}
+              />
+            </label>
+            <label className="field">
+              离开时间（设备时区）
+              <input
+                name="ended_at"
+                type="datetime-local"
+                defaultValue={instantToLocalInput(visit.ended_at)}
+              />
+            </label>
+          </div>
+          <label className="field">
+            备注
+            <textarea name="note" rows={2} defaultValue={visit.note ?? ""} />
+          </label>
+          {update.error && (
+            <p role="alert" className="error-message">
+              {update.error.message}
+            </p>
+          )}
+          <Button disabled={update.isPending}>
+            {update.isPending ? "保存中…" : "保存访问记录"}
+          </Button>
+        </form>
+      )}
     </div>
+  );
+}
+
+function EditActivity({
+  activity,
+  days,
+  places,
+  onDone,
+}: {
+  activity: Activity;
+  days: TripDay[];
+  places: Place[];
+  onDone: () => void;
+}) {
+  const client = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (form: FormData) => {
+      const start = String(form.get("start_at"));
+      const end = String(form.get("end_at"));
+      return api.updateActivity(activity.id, {
+        title: String(form.get("title")).trim(),
+        trip_day_id: String(form.get("trip_day")),
+        place_id: String(form.get("place")) || null,
+        type: String(form.get("type")),
+        start_at: start ? inputToInstant(start) : null,
+        end_at: end ? inputToInstant(end) : null,
+        note: String(form.get("note")).trim() || null,
+      });
+    },
+    onSuccess: async () => {
+      await refreshTravel(client);
+      onDone();
+    },
+  });
+  return (
+    <form
+      className="mt-3 space-y-3 rounded-lg bg-muted p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        mutation.mutate(new FormData(event.currentTarget));
+      }}
+    >
+      <div className="form-grid">
+        <label className="field">
+          标题
+          <input
+            name="title"
+            required
+            maxLength={200}
+            defaultValue={activity.title}
+          />
+        </label>
+        <label className="field">
+          日期
+          <select name="trip_day" defaultValue={activity.trip_day_id}>
+            {days.map((day) => (
+              <option key={day.id} value={day.id}>
+                {day.date} · {day.title || "自由探索"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          所属城市
+          <select name="place" defaultValue={activity.place_id ?? ""}>
+            <option value="">未分配城市</option>
+            {places.map((place) => (
+              <option key={place.id} value={place.id}>
+                {place.canonical_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          类型
+          <select name="type" defaultValue={activity.type}>
+            {[
+              ["VISIT", "游览"],
+              ["TRANSPORT", "交通"],
+              ["FOOD", "餐饮"],
+              ["HOTEL", "住宿"],
+              ["EVENT", "活动"],
+              ["FREE_TIME", "自由时间"],
+              ["OTHER", "其他"],
+            ].map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          开始时间（设备时区）
+          <input
+            name="start_at"
+            type="datetime-local"
+            defaultValue={instantToLocalInput(activity.start_at)}
+          />
+        </label>
+        <label className="field">
+          结束时间（设备时区）
+          <input
+            name="end_at"
+            type="datetime-local"
+            defaultValue={instantToLocalInput(activity.end_at)}
+          />
+        </label>
+      </div>
+      <label className="field">
+        备注
+        <textarea name="note" rows={2} defaultValue={activity.note ?? ""} />
+      </label>
+      {mutation.error && (
+        <p role="alert" className="error-message">
+          {mutation.error.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button disabled={mutation.isPending}>
+          {mutation.isPending ? "保存中…" : "保存活动"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          取消
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function EditTripDay({ day, onDone }: { day: TripDay; onDone: () => void }) {
+  const client = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (form: FormData) =>
+      api.updateDay(day.id, {
+        date: String(form.get("date")),
+        title: String(form.get("title")).trim() || null,
+        note: String(form.get("note")).trim() || null,
+      }),
+    onSuccess: async () => {
+      await refreshTravel(client);
+      onDone();
+    },
+  });
+  return (
+    <form
+      className="mt-3 space-y-3 rounded-lg bg-muted p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        mutation.mutate(new FormData(event.currentTarget));
+      }}
+    >
+      <div className="form-grid">
+        <label className="field">
+          日期
+          <input name="date" type="date" required defaultValue={day.date} />
+        </label>
+        <label className="field">
+          当天主题
+          <input name="title" maxLength={200} defaultValue={day.title ?? ""} />
+        </label>
+      </div>
+      <label className="field">
+        备注
+        <textarea name="note" rows={2} defaultValue={day.note ?? ""} />
+      </label>
+      <p className="muted">
+        修改日期会移动这一天的日历归属；关联的访问记录和活动仍保留在本旅行日，记录的实际时间不会被自动改写。
+      </p>
+      {mutation.error && (
+        <p role="alert" className="error-message">
+          {mutation.error.message}
+        </p>
+      )}
+      <div className="flex gap-2">
+        <Button disabled={mutation.isPending}>
+          {mutation.isPending ? "保存中…" : "保存旅行日"}
+        </Button>
+        <Button type="button" variant="outline" onClick={onDone}>
+          取消
+        </Button>
+      </div>
+    </form>
   );
 }
 
@@ -150,6 +445,10 @@ export function TripDetail({
   const client = useQueryClient();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  const [editingDayId, setEditingDayId] = useState<string | null>(null);
+  const [editingActivityId, setEditingActivityId] = useState<string | null>(
+    null,
+  );
   const [recording, setRecording] = useState(startAdding);
   const [savedPlace, setSavedPlace] = useState<Place | null>(null);
   const trip = useQuery({
@@ -402,40 +701,72 @@ export function TripDetail({
                     {day.title || "自由探索"} · 打开日历 ↗
                   </Link>
                 </div>
-                <button
-                  className="text-button"
-                  disabled={action.isPending}
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "删除这一天及其活动安排？已有访问记录会保留。",
+                <div className="flex gap-3">
+                  <button
+                    className="text-button"
+                    onClick={() =>
+                      setEditingDayId(editingDayId === day.id ? null : day.id)
+                    }
+                  >
+                    {editingDayId === day.id ? "取消编辑" : "编辑"}
+                  </button>
+                  <button
+                    className="text-button"
+                    disabled={action.isPending}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          "删除这一天及其活动安排？已有访问记录会保留。",
+                        )
                       )
-                    )
-                      action.mutate(() => api.deleteDay(day.id));
-                  }}
-                >
-                  删除一天
-                </button>
+                        action.mutate(() => api.deleteDay(day.id));
+                    }}
+                  >
+                    删除一天
+                  </button>
+                </div>
               </div>
+              {editingDayId === day.id && (
+                <EditTripDay day={day} onDone={() => setEditingDayId(null)} />
+              )}
               <ul className="mt-4 space-y-2">
                 {activities.data
                   ?.filter((a) => a.trip_day_id === day.id)
                   .map((a) => (
-                    <li
-                      key={a.id}
-                      className="flex justify-between gap-3 text-sm"
-                    >
-                      <span>{a.title}</span>
-                      <button
-                        className="text-button"
-                        disabled={action.isPending}
-                        onClick={() => {
-                          if (window.confirm("删除这项活动？"))
-                            action.mutate(() => api.deleteActivity(a.id));
-                        }}
-                      >
-                        删除
-                      </button>
+                    <li key={a.id} className="text-sm">
+                      <div className="flex justify-between gap-3">
+                        <span>{a.title}</span>
+                        <div className="flex gap-3">
+                          <button
+                            className="text-button"
+                            onClick={() =>
+                              setEditingActivityId(
+                                editingActivityId === a.id ? null : a.id,
+                              )
+                            }
+                          >
+                            {editingActivityId === a.id ? "取消编辑" : "编辑"}
+                          </button>
+                          <button
+                            className="text-button"
+                            disabled={action.isPending}
+                            onClick={() => {
+                              if (window.confirm("删除这项活动？"))
+                                action.mutate(() => api.deleteActivity(a.id));
+                            }}
+                          >
+                            删除
+                          </button>
+                        </div>
+                      </div>
+                      {editingActivityId === a.id && days.data && (
+                        <EditActivity
+                          activity={a}
+                          days={days.data}
+                          places={tripPlaces}
+                          onDone={() => setEditingActivityId(null)}
+                        />
+                      )}
                     </li>
                   ))}
               </ul>

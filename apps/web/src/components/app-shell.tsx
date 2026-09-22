@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Globe2, Inbox, Notebook, UserRound } from "lucide-react";
+import { CalendarDays, Globe2, Notebook, UserRound } from "lucide-react";
 import { AuthStatus } from "@/components/auth-status";
 import { AuthRedirect } from "@/components/auth-redirect";
 import { webOidcEnabled } from "@/lib/auth-mode";
@@ -10,7 +10,6 @@ const links = [
   { href: "/", label: "我的世界", icon: Globe2 },
   { href: "/calendar", label: "旅行日历", icon: CalendarDays },
   { href: "/trips", label: "旅行档案", icon: Notebook },
-  { href: "/inbox", label: "收件箱", icon: Inbox },
   { href: "/profile", label: "我的", icon: UserRound },
 ];
 export function AppShell({ children }: { children: React.ReactNode }) {

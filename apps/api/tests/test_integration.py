@@ -8,14 +8,16 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from geoalchemy2.elements import WKTElement
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.main import app
-from app.models import User, UserIdentity, Visit
-from app.routers.deps import current_user
+from app.models import Activity, Place, Trip, TripDay, User, UserIdentity, Visit, WishlistItem
+from app.providers.auth import AuthPrincipal
+from app.routers.deps import current_user, recent_oidc_principal
 
 pytestmark = pytest.mark.integration
 
@@ -52,6 +54,125 @@ def test_region_selection_reuses_place_and_projects_trip_visit(database: Session
             assert marker["region_id"] == "cn:3201"
             assert marker["visit_count"] == 1
             assert client.post("/api/v1/regions/cn:invalid/place").status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_profile_export_includes_linked_records_and_is_audited(
+    database: Session, caplog: pytest.LogCaptureFixture
+) -> None:
+    user = User(display_name="export owner")
+    place = Place(
+        canonical_name="Kyoto",
+        country_code="JP",
+        timezone="Asia/Tokyo",
+        location=WKTElement("POINT(135.7681 35.0116)", srid=4326),
+    )
+    database.add_all([user, place])
+    database.flush()
+    trip = Trip(user_id=user.id, title="Kyoto", slug="kyoto", timezone="Asia/Tokyo")
+    database.add(trip)
+    database.flush()
+    trip_day = TripDay(trip_id=trip.id, date=datetime(2026, 10, 2).date(), title="Old town")
+    database.add(trip_day)
+    database.flush()
+    visit = Visit(
+        user_id=user.id,
+        trip_id=trip.id,
+        trip_day_id=trip_day.id,
+        place_id=place.id,
+        visited_at=datetime(2026, 10, 2, 0, tzinfo=UTC),
+    )
+    activity = Activity(
+        trip_id=trip.id,
+        trip_day_id=trip_day.id,
+        place_id=place.id,
+        type="VISIT",
+        title="Temple walk",
+    )
+    wishlist = WishlistItem(user_id=user.id, place_id=place.id, note="Return in spring")
+    database.add_all([visit, activity, wishlist])
+    database.commit()
+    app.dependency_overrides[get_session] = lambda: database
+    app.dependency_overrides[current_user] = lambda: user
+    try:
+        with caplog.at_level("INFO", logger="tovia.audit"), TestClient(app) as client:
+            response = client.get("/api/v1/me/export")
+        assert response.status_code == 200
+        exported = response.json()["data"]
+        assert exported["schema_version"] == "1.0"
+        records = exported["data"]
+        assert records["user"]["id"] == str(user.id)
+        assert records["trips"][0]["id"] == str(trip.id)
+        assert records["trip_days"][0]["trip_id"] == str(trip.id)
+        assert records["visits"][0]["trip_day_id"] == str(trip_day.id)
+        assert records["activities"][0]["place_id"] == str(place.id)
+        assert records["places"][0]["id"] == str(place.id)
+        assert records["wishlist_items"][0]["place_id"] == str(place.id)
+        assert any('"event":"data.export"' in record.message for record in caplog.records)
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_account_deletion_removes_logto_and_local_user_data(
+    database: Session, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from app.services import core as core_service
+
+    user = User(display_name="delete owner")
+    place = Place(
+        canonical_name="Osaka",
+        country_code="JP",
+        timezone="Asia/Tokyo",
+        location=WKTElement("POINT(135.5 34.7)", srid=4326),
+    )
+    database.add_all([user, place])
+    database.flush()
+    trip = Trip(user_id=user.id, title="Osaka", slug="osaka", timezone="Asia/Tokyo")
+    database.add(trip)
+    database.flush()
+    trip_day = TripDay(trip_id=trip.id, date=datetime(2026, 10, 2).date())
+    database.add(trip_day)
+    database.flush()
+    database.add_all(
+        [
+            UserIdentity(user_id=user.id, provider="logto", provider_subject="logto-user-1"),
+            Visit(
+                user_id=user.id,
+                trip_id=trip.id,
+                trip_day_id=trip_day.id,
+                place_id=place.id,
+                visited_at=datetime(2026, 10, 2, 0, tzinfo=UTC),
+            ),
+            WishlistItem(user_id=user.id, place_id=place.id),
+        ]
+    )
+    database.commit()
+    provider_deletions: list[str] = []
+    monkeypatch.setattr(
+        core_service,
+        "delete_logto_user",
+        lambda _settings, subject: provider_deletions.append(subject),
+    )
+    app.dependency_overrides[get_session] = lambda: database
+    app.dependency_overrides[current_user] = lambda: user
+    app.dependency_overrides[recent_oidc_principal] = lambda: AuthPrincipal(
+        user_id=user.id, provider="logto", subject="logto-user-1", issued_at=1
+    )
+    try:
+        with caplog.at_level("INFO", logger="tovia.audit"), TestClient(app) as client:
+            response = client.post("/api/v1/me/delete", json={"confirmation": "DELETE"})
+        assert response.status_code == 200
+        assert provider_deletions == ["logto-user-1"]
+        assert database.scalar(select(User.id).where(User.id == user.id)) is None
+        assert (
+            database.scalar(select(UserIdentity.id).where(UserIdentity.user_id == user.id)) is None
+        )
+        assert database.scalar(select(Visit.id).where(Visit.user_id == user.id)) is None
+        assert (
+            database.scalar(select(WishlistItem.id).where(WishlistItem.user_id == user.id)) is None
+        )
+        assert any('"event":"account.deletion"' in record.message for record in caplog.records)
     finally:
         app.dependency_overrides.clear()
 

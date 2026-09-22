@@ -6,6 +6,9 @@
 
 - `GET /health`（无版本前缀、无认证）：返回标准 envelope，data 含 `status`、`database`、`postgis`、`migration`。依赖和迁移均正常时为 200，否则 503。
 - 已实现 `/me` GET/PATCH；`/trips` GET/POST；`/trips/{id}` GET/PATCH/DELETE。
+- v0.3 增加 `GET /me/export`：返回显式版本化的 `DataExport` schema，包含 `schema_version`、`exported_at` 和 `data`；data 包含 User、Trip、TripDay、Visit、Activity、所有被引用的 Place 与 WishlistItem，并保留 UUID 和外键关联。成功导出记入审计日志；下载文件可用 `python -m app.commands.validate_export <path>` 离线校验格式、时区时间、重复 ID 和引用完整性。
+- v0.3 增加 `POST /me/delete`，body 固定为 `{"confirmation":"DELETE"}`。仅允许 Logto 身份，并要求 access token 的签发时间在 5 分钟内；先通过服务端 Management API 删除 Logto 用户，再级联删除本地账户数据。缺少配置、认证过期或身份服务失败均 fail closed。管理接口凭据不得放入 Web。
+- `PATCH /visits/{id}`、`PATCH /activities/{id}`、`PATCH /days/{id}` 已连接 Web 编辑表单；所有变更仍校验当前用户所有权与原有完整实体约束。
 - 已实现 `/trips/{id}/days` GET/POST，补充 `/days/{id}` PATCH/DELETE。
 - 已实现 `/places/search` GET、`/places/{id}` GET，补充 `/places` POST 供 Phase 1 手工添加。坐标输入为 WGS84 latitude/longitude，范围必须合法且提供 IANA timezone。共享 Place 暂不开放更新/删除；nearby 留到地图阶段。
 - 已实现 `/visits` GET/POST，`/visits/{id}` PATCH/DELETE。列表支持 trip_id 过滤。

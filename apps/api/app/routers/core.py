@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, Query
 
 from app.models import Activity, Place, Trip, TripDay, Visit
 from app.providers.regions import Region
-from app.routers.deps import CurrentUser, Db
+from app.routers.deps import CurrentUser, Db, RecentOidcPrincipal
 from app.schemas.common import Envelope
 from app.schemas.core import (
+    AccountDelete,
     ActivityCreate,
     ActivityPatch,
     ActivityRead,
@@ -25,6 +26,7 @@ from app.schemas.core import (
     VisitPatch,
     VisitRead,
 )
+from app.schemas.data_export import DataExport
 from app.services.core import TravelService
 from app.services.regions import RegionService
 
@@ -48,6 +50,19 @@ def me(user: CurrentUser) -> Envelope[UserRead]:
 @router.patch("/me", tags=["users"])
 def update_me(payload: UserPatch, service: Service) -> Envelope[UserRead]:
     return Envelope(data=UserRead.model_validate(service.patch_user(payload)))
+
+
+@router.get("/me/export", tags=["users"])
+def export_me(service: Service) -> Envelope[DataExport]:
+    return Envelope(data=service.export_data())
+
+
+@router.post("/me/delete", tags=["users"])
+def delete_me(
+    payload: AccountDelete, service: Service, principal: RecentOidcPrincipal
+) -> Envelope[None]:
+    service.delete_account(principal)
+    return Envelope()
 
 
 @router.get("/trips", tags=["trips"])
@@ -180,7 +195,7 @@ def patch_visit(visit_id: UUID, payload: VisitPatch, service: Service) -> Envelo
 
 @router.delete("/visits/{visit_id}", tags=["visits"])
 def delete_visit(visit_id: UUID, service: Service) -> Envelope[None]:
-    service.repo.delete(service.visit(visit_id))
+    service.delete_visit(visit_id)
     return Envelope()
 
 
@@ -218,5 +233,5 @@ def patch_activity(
 
 @router.delete("/activities/{activity_id}", tags=["activities"])
 def delete_activity(activity_id: UUID, service: Service) -> Envelope[None]:
-    service.repo.delete(service.activity(activity_id))
+    service.delete_activity(activity_id)
     return Envelope()

@@ -42,6 +42,8 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 
 把该应用的 App ID 和 App Secret 写入 `apps/web/.env.local`。不要复用 Device Flow 应用，也不要把 App Secret 提交到仓库。
 
+若要验证 v0.3 账户删除，请另建专用 **Machine-to-machine** 应用，并分配包含删除用户权限的 Logto Management API role。M2M 凭据只放在根目录 `.env`，由 Compose 仅传给 API：`LOGTO_MANAGEMENT_TOKEN_ENDPOINT=http://logto:3001/oidc/token`、`LOGTO_MANAGEMENT_API_URL=http://logto:3001/api`、`LOGTO_MANAGEMENT_API_RESOURCE=https://default.logto.app/api`，以及对应的 `LOGTO_MANAGEMENT_CLIENT_ID` / `LOGTO_MANAGEMENT_CLIENT_SECRET`。传统 Web 应用与 M2M 应用必须分开。真实删号会永久删除 Logto 用户及该 Tovia 用户的数据，只能对专用测试账户执行。
+
 ## 3. 获取用户 access token
 
 把下面的 `<device-app-id>` 替换为第 2 步的 App ID：

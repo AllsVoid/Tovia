@@ -69,7 +69,8 @@ Logto 正式身份采用渐进式接入，分阶段范围、回归门槛和回�
 - 阶段 A 已完成（2026-09-20）：建立与身份厂商无关的认证凭证、主体契约和配置边界；补齐 API 认证保护与现有开发身份的回归测试。此阶段没有引入 Logto SDK、OIDC 运行模式、数据库迁移或登录界面，现有运行行为保持不变。
 - 阶段 B 已完成（2026-09-20）：新增本地 `UserIdentity` 映射、唯一约束、向前兼容迁移和显式运维绑定命令；真实 PostgreSQL/PostGIS 验证原有 User/Trip UUID 保持不变。请求认证仍只使用 development provider。
 - 阶段 C 已完成（2026-09-20）：增加默认关闭的 OIDC Bearer provider，只允许 Logto 默认的 ES384 和密钥轮换可用的 RS256，并校验 JWKS 签名、issuer、audience、expiry 和 subject；只解析已绑定的本地身份，不自动注册。浏览器登录仍未接入。
-- 阶段 G 实现完成，待真实环境验收（2026-09-22）：API production 仅允许 OIDC、公开 issuer 强制 HTTPS；Web production 启动时要求 OIDC、HTTPS endpoint 和完整密钥；JWKS 连接故障 fail-closed 并返回 503；认证成功、凭证拒绝和身份映射冲突写入带 request ID 的 JSON 审计日志。真实 HTTPS/Logto 部署、备份恢复及回滚演练尚未执行，故 v0.3 仍未完成。
+- 阶段 G 实现完成，待真实环境验收（2026-09-22）：API production 仅允许 OIDC、公开 issuer 强制 HTTPS；Web production 启动时要求 OIDC、HTTPS endpoint 和完整密钥；JWKS 连接故障 fail-closed 并返回 503；认证成功、凭证拒绝和身份映射冲突写入带 request ID 的 JSON 审计日志。隔离 PostGIS 的自动备份恢复演练已通过；真实 HTTPS/Logto 部署和应用回滚演练尚未执行，故 v0.3 仍未完成。
+- 数据维护工作包实现完成（2026-09-22）：Profile 可编辑显示名称、时区和语言；JSON 导出涵盖当前用户全部已实现实体并保留 UUID/关联，并提供独立离线校验命令检查 schema、时间和引用；Visit、Activity、TripDay 可在 Web 修正；Logto 账户删除需要 prompt=login、5 分钟内签发的 token、二次文字确认及 API 服务端 Management API 配置；导出和关键删除均记审计。PostGIS 集成测试与迁移往返通过；真实 Logto Management API 删除、双账户浏览器流程和生产环境运维演练仍未执行。
 - 后续阶段按 [AUTH_LOGTO_ROADMAP.md](AUTH_LOGTO_ROADMAP.md) 逐步实施；每阶段独立验证和回滚，不跨阶段预装组件。
 
 ### 必须实现
@@ -91,6 +92,7 @@ Logto 正式身份采用渐进式接入，分阶段范围、回归门槛和回�
 - 导出文件可通过验证脚本检查引用完整性、时间与金额格式。
 - 生产配置不能启用开发身份；无有效会话时所有业务接口返回 401。
 - 新库安装、从 v0.2 升级、数据库备份与恢复演练通过。
+- Profile 导出文件可校验所有已导出记录的 ID 与引用；账户删除在真实 Logto 环境验证重新认证、身份删除和本地数据清理结果。
 
 ### 本版本不做
 

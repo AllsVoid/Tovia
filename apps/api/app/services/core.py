@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, TypeVar
 from uuid import UUID, uuid4
 
@@ -6,20 +6,31 @@ from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
 from pydantic import BaseModel
 from sqlalchemy import cast, func, select, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.audit import audit_data_event
+from app.config import get_settings
 from app.errors import DomainError
-from app.models import Activity, Base, Place, Trip, TripDay, User, Visit
+from app.models import Activity, Base, Place, Trip, TripDay, User, UserIdentity, Visit, WishlistItem
+from app.providers.auth import AuthPrincipal
+from app.providers.logto_management import delete_logto_user
 from app.repositories.core import Repository
 from app.schemas.core import (
     ActivityCreate,
+    ActivityRead,
     DayCreate,
+    DayRead,
     PlaceCreate,
     PlaceRead,
     TripCreate,
+    TripRead,
+    UserRead,
     UserUpdate,
     VisitCreate,
+    VisitRead,
 )
+from app.schemas.data_export import DataExport, ExportRecords, WishlistItemExport
 
 S = TypeVar("S", bound=BaseModel)
 
@@ -91,6 +102,13 @@ class TravelService:
             update(Visit).where(Visit.trip_id == trip_id).values(trip_id=None, trip_day_id=None)
         )
         self.repo.delete(trip)
+        audit_data_event(
+            "data.entity_deletion",
+            "succeeded",
+            entity="trip",
+            entity_id=str(trip_id),
+            user_id=str(self.user.id),
+        )
 
     @staticmethod
     def validate_day_date(trip: Trip | TripCreate, day_date: date) -> None:
@@ -115,6 +133,13 @@ class TravelService:
             update(Visit).where(Visit.trip_day_id == day_id).values(trip_day_id=None)
         )
         self.repo.delete(day)
+        audit_data_event(
+            "data.entity_deletion",
+            "succeeded",
+            entity="trip_day",
+            entity_id=str(day_id),
+            user_id=str(self.user.id),
+        )
 
     def create_place(self, payload: PlaceCreate) -> Place:
         values = payload.model_dump(exclude={"latitude", "longitude", "metadata"})
@@ -180,6 +205,155 @@ class TravelService:
     def patch_user(self, patch: BaseModel) -> User:
         payload = merge_payload(UserUpdate, self.user, patch)
         return self.apply(self.user, payload.model_dump())
+
+    def export_data(self) -> DataExport:
+        trips = self.session.scalars(
+            select(Trip).where(Trip.user_id == self.user.id).order_by(Trip.created_at, Trip.id)
+        ).all()
+        trip_ids = [trip.id for trip in trips]
+        days = (
+            self.session.scalars(
+                select(TripDay)
+                .where(TripDay.trip_id.in_(trip_ids))
+                .order_by(TripDay.date, TripDay.id)
+            ).all()
+            if trip_ids
+            else []
+        )
+        visits = self.session.scalars(
+            select(Visit).where(Visit.user_id == self.user.id).order_by(Visit.visited_at, Visit.id)
+        ).all()
+        activities = (
+            self.session.scalars(
+                select(Activity)
+                .where(Activity.trip_id.in_(trip_ids))
+                .order_by(Activity.trip_id, Activity.trip_day_id, Activity.sort_order, Activity.id)
+            ).all()
+            if trip_ids
+            else []
+        )
+        wishlist = self.session.scalars(
+            select(WishlistItem)
+            .where(WishlistItem.user_id == self.user.id)
+            .order_by(WishlistItem.created_at, WishlistItem.id)
+        ).all()
+        place_ids = {visit.place_id for visit in visits}
+        place_ids.update(
+            activity.place_id for activity in activities if activity.place_id is not None
+        )
+        place_ids.update(item.place_id for item in wishlist)
+        places = (
+            self.session.scalars(
+                select(Place).where(Place.id.in_(place_ids)).order_by(Place.id)
+            ).all()
+            if place_ids
+            else []
+        )
+        exported = DataExport(
+            schema_version="1.0",
+            exported_at=datetime.now(UTC),
+            data=ExportRecords(
+                user=UserRead.model_validate(self.user),
+                trips=[TripRead.model_validate(trip) for trip in trips],
+                trip_days=[DayRead.model_validate(day) for day in days],
+                visits=[VisitRead.model_validate(visit) for visit in visits],
+                activities=[ActivityRead.model_validate(activity) for activity in activities],
+                places=[self.place_read(place) for place in places],
+                wishlist_items=[WishlistItemExport.model_validate(item) for item in wishlist],
+            ),
+        )
+        audit_data_event(
+            "data.export",
+            "succeeded",
+            user_id=str(self.user.id),
+            trips=len(trips),
+            trip_days=len(days),
+            visits=len(visits),
+            activities=len(activities),
+            places=len(places),
+            wishlist_items=len(wishlist),
+        )
+        return exported
+
+    def delete_visit(self, visit_id: UUID) -> None:
+        visit = self.visit(visit_id)
+        self.repo.delete(visit)
+        audit_data_event(
+            "data.entity_deletion",
+            "succeeded",
+            entity="visit",
+            entity_id=str(visit_id),
+            user_id=str(self.user.id),
+        )
+
+    def delete_activity(self, activity_id: UUID) -> None:
+        activity = self.activity(activity_id)
+        self.repo.delete(activity)
+        audit_data_event(
+            "data.entity_deletion",
+            "succeeded",
+            entity="activity",
+            entity_id=str(activity_id),
+            user_id=str(self.user.id),
+        )
+
+    def delete_account(self, principal: AuthPrincipal) -> None:
+        if principal.provider != "logto" or principal.user_id != self.user.id:
+            raise DomainError(
+                "ACCOUNT_DELETION_REQUIRES_OIDC",
+                "Sign in with your Logto account before deleting this account",
+                403,
+            )
+        identity = self.session.scalar(
+            select(UserIdentity).where(
+                UserIdentity.user_id == self.user.id,
+                UserIdentity.provider == principal.provider,
+                UserIdentity.provider_subject == principal.subject,
+            )
+        )
+        if identity is None:
+            raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
+
+        user_id = str(self.user.id)
+        provider_name = identity.provider
+        provider_subject = identity.provider_subject
+        settings = get_settings()
+        audit_data_event(
+            "account.deletion",
+            "requested",
+            user_id=user_id,
+            provider=provider_name,
+        )
+        delete_logto_user(settings, provider_subject)
+        try:
+            # Visits are independent facts, so detach the container references
+            # before user/trip cascades while deleting the account's own rows.
+            self.session.execute(
+                update(Visit)
+                .where(Visit.user_id == self.user.id)
+                .values(trip_id=None, trip_day_id=None)
+            )
+            self.session.delete(self.user)
+            self.session.commit()
+        except SQLAlchemyError as exc:
+            self.session.rollback()
+            audit_data_event(
+                "account.deletion",
+                "local_failed_after_provider_deletion",
+                user_id=user_id,
+                provider=provider_name,
+            )
+            raise DomainError(
+                "ACCOUNT_DELETION_INCOMPLETE",
+                "Identity was removed but local data cleanup failed; contact support",
+                503,
+            ) from exc
+        audit_data_event(
+            "account.deletion",
+            "succeeded",
+            user_id=user_id,
+            provider=provider_name,
+        )
 
     def apply[M: Base](self, entity: M, values: dict[str, Any]) -> M:
         for name, value in values.items():

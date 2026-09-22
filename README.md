@@ -6,6 +6,17 @@
 
 当前已实现 Phase 0 → Phase 2：基础设施、核心旅行 CRUD、真实数据地图、旅行月历、旅行详情与愿望清单。AI 功能尚未开发。
 
+v0.3 还提供 Profile 资料维护、关联完整的 JSON 数据导出，以及 Visit、Activity 和 TripDay 编辑。Logto 登录模式下可重新认证后删除账户；本地 development 身份不开放删号。收件箱尚未实现，因此暂不显示入口。
+
+下载数据后，可在 API 环境中离线检查 JSON 格式、时区时间、重复 ID 和实体引用完整性：
+
+```bash
+cd apps/api
+uv run python -m app.commands.validate_export /path/to/tovia-export-2026-09-22.json
+```
+
+校验成功会输出 `VALID` 及各实体数量；文件损坏、版本不支持或引用缺失时返回非零退出码。
+
 ## 启动
 
 ### 使用 Docker
@@ -73,6 +84,7 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml up -d
 1. 在 **API resources** 创建 API Resource，identifier 设为 `https://api.tovia.local`。
 2. 在 **Applications** 创建 **Traditional Web** 应用 `Tovia Web`，添加 Redirect URI `http://localhost:3000/callback` 和 Post sign-out redirect URI `http://localhost:3000/`，并允许该应用请求上述 API Resource。记下 App ID 和 App Secret。
 3. 在 **User management** 创建仅供本地测试的用户。Console 中用户的 User ID 是 token 的 `sub`，稍后需要用它绑定 Tovia 用户。
+4. 若要验证账户删除，在 **Applications** 创建专用 **Machine-to-machine** 应用，并为它分配 Logto Management API 的用户删除权限。不要把这组凭据交给 Web 或浏览器。
 
 先在默认 development 模式启动 Tovia，并请求一次 `http://localhost:8000/api/v1/me`，确保默认 Tovia 用户已创建。把 Web 登录配置放进仓库根目录 `.env`（Compose 会传给 Web 容器）：
 
@@ -94,6 +106,18 @@ OIDC_ISSUER=http://localhost:3001/oidc
 OIDC_AUDIENCE=https://api.tovia.local
 OIDC_JWKS_URL=http://logto:3001/oidc/jwks
 ```
+
+账户删除由 API 服务端调用 Logto Management API。自托管 Logto 可在 `.env` 配置：
+
+```dotenv
+LOGTO_MANAGEMENT_TOKEN_ENDPOINT=http://logto:3001/oidc/token
+LOGTO_MANAGEMENT_API_URL=http://logto:3001/api
+LOGTO_MANAGEMENT_API_RESOURCE=https://default.logto.app/api
+LOGTO_MANAGEMENT_CLIENT_ID=<management-m2m-app-id>
+LOGTO_MANAGEMENT_CLIENT_SECRET=<management-m2m-app-secret>
+```
+
+Logto Cloud 的 endpoint/resource 使用该 tenant 的默认 `*.logto.app` 域名。M2M secret 只传给 API 容器。删除流程要求近期重新登录及输入 `DELETE` 确认；Logto 删除成功后，API 再清理 Tovia 本地资料与关联数据。未配置 Management API 时删号请求 fail closed，不删除本地数据。
 
 然后使用 OIDC override 启动 Tovia：
 
@@ -133,6 +157,8 @@ CORS_ORIGINS=["https://travel.example.com"]
 
 如果服务器启用 Logto 登录，`LOGTO_ENDPOINT` 和 `OIDC_ISSUER` 必须使用外部可访问的认证域名，且 issuer 必须与 token 的 `iss` 完全一致；通常是 `https://auth.example.com` 和 `https://auth.example.com/oidc`。Traditional Web 应用的 Redirect URI、登出回调也要改成生产 Web 域名（例如 `https://travel.example.com/callback` 与 `https://travel.example.com/`）。`LOGTO_BASE_URL` 设为 Web HTTPS 地址，`LOGTO_COOKIE_SECRET` 使用新的随机值，`LOGTO_APP_SECRET` 使用生产 Logto 应用的密钥；`OIDC_AUDIENCE` 继续与 API Resource identifier 相同。若 Logto 与 Tovia Compose 共享网络，`OIDC_JWKS_URL` 可继续用 `http://logto:3001/oidc/jwks`；否则需改成 API 容器可以访问的 JWKS 地址。Logto 自身使用独立的 `infra/logto/.env`，其 `LOGTO_ENDPOINT`、`LOGTO_ADMIN_ENDPOINT` 和绑定端口也须按域名及反向代理调整，并保护 Console 管理入口。
 
+生产环境还必须给 API 配置专用 Logto Management API M2M 凭据（token endpoint、API URL/resource、client ID/secret），否则 API 会拒绝启动。M2M role 至少需能删除用户；凭据只传入 API 容器。只有在完成该配置并通过真实删除演练后，才应向用户开放账户删除。
+
 生产 API 只接受 `APP_ENV=production` 与 `AUTH_MODE=oidc`，要求 HTTPS issuer 和非示例数据库密码；生产 Web 也必须启用 OIDC 并提供 HTTPS Logto/Web 地址及完整密钥。配置不满足时服务启动失败。OIDC 凭证无效或过期返回 401；Logto/JWKS 暂时不可用返回 503，不会切换到开发用户。API 输出 JSON 认证审计事件（成功、拒绝、provider 不可用、身份绑定冲突），响应头 `X-Request-ID` 可用于关联排查。日志不记录 bearer token 或原始 subject；请限制日志访问并按部署的数据保留政策管理。
 
 Logto 应用密钥轮换时，先在 Logto 创建/轮换密钥并更新部署 secret，再重启 Web；确认登录和登出正常后撤销旧密钥。签名密钥应先让新旧公钥在 JWKS 中并存，验证新签发 token 后，再等最长 access-token 有效期和 API 5 分钟 JWKS 缓存窗口过去后撤销旧密钥。API 会对未知 `kid` 重新读取 JWKS；切勿在重叠验证完成前移除旧公钥。
@@ -158,6 +184,14 @@ docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d tovia_restore_check
 docker compose exec -T db sh -c 'dropdb -U "$POSTGRES_USER" tovia_restore_check'
 docker compose exec -T db rm -f /tmp/tovia-restore-check.dump
 ```
+
+在 Linux/WSL 中也可以执行自动演练。脚本生成 custom-format 备份，在随机命名的临时数据库中恢复，核对 Alembic revision、PostGIS 和核心表行数后删除临时数据库；备份文件保留在 `infra/backups/`：
+
+```bash
+bash infra/scripts/verify-backup-restore.sh
+```
+
+可将备份目录作为第一个参数传入。需要对隔离的 Compose project 验证时，设置 `TOVIA_COMPOSE_PROJECT`，并确保同名 project 的 `db` 服务已经运行。
 
 保留每次部署所用的应用镜像/代码版本、Compose 配置和受控 secret 版本。认证配置或应用回滚时，恢复上一已验证版本与对应配置；OIDC 阶段不改写 User UUID 或旅行数据外键。发生数据库损坏时先停止 API 写入，从已验证备份恢复到新数据库/卷，检查 PostGIS 和 Alembic revision，再切换连接并检查 `/health`。Logto 的身份数据库须独立备份和恢复，步骤见[Logto 运维说明](infra/logto/README.md)。
 

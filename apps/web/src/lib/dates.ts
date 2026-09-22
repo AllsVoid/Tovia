@@ -16,6 +16,13 @@ export function inputToInstant(value: string): string {
     throw new Error("这个本地时间不存在，请检查夏令时或日期。");
   return instant.toISOString();
 }
+export function instantToLocalInput(value: string | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
+    .toISOString()
+    .slice(0, 16);
+}
 export function formatInstant(value: string, timezone: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
     timeZone: timezone,

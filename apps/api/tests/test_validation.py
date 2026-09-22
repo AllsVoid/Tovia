@@ -81,6 +81,11 @@ def test_production_oidc_accepts_internal_http_jwks_endpoint() -> None:
         oidc_audience="https://api.example.com",
         oidc_jwks_url="http://logto:3001/oidc/jwks",
         database_url="postgresql+psycopg://tovia:production-secret@db:5432/tovia",
+        logto_management_token_endpoint="http://logto:3001/oidc/token",
+        logto_management_api_url="http://logto:3001/api",
+        logto_management_api_resource="https://default.logto.app/api",
+        logto_management_client_id="management-client",
+        logto_management_client_secret="management-secret",
         _env_file=None,
     )
     assert settings.auth_mode == "oidc"

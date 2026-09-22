@@ -17,7 +17,7 @@ def reset_request_id(token: Token[str | None]) -> None:
 
 
 def audit_auth_event(event: str, outcome: str, **fields: Any) -> None:
-    """Emit one machine-readable auth audit record without credential material."""
+    """Emit one machine-readable audit record without credential material."""
     record = {
         "timestamp": datetime.now(UTC).isoformat(),
         "event": event,
@@ -26,3 +26,8 @@ def audit_auth_event(event: str, outcome: str, **fields: Any) -> None:
         **fields,
     }
     logger.info(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
+
+
+def audit_data_event(event: str, outcome: str, **fields: Any) -> None:
+    """Emit an auditable data action; callers must never include user content."""
+    audit_auth_event(event, outcome, **fields)

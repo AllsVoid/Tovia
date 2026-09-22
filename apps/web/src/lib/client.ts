@@ -29,6 +29,12 @@ export const apiUrl =
 export const apiBaseUrl = webOidcEnabled ? "/api/bff" : `${apiUrl}/api/v1`;
 const messages: Record<string, string> = {
   AUTH_REQUIRED: "请启用本地开发认证，或配置登录服务。",
+  RECENT_AUTH_REQUIRED: "请重新登录后再删除账户。",
+  ACCOUNT_DELETION_UNAVAILABLE: "账户删除服务尚未配置，请联系管理员。",
+  ACCOUNT_PROVIDER_UNAVAILABLE:
+    "身份服务暂时不可用；本地数据未删除，请稍后重试。",
+  ACCOUNT_DELETION_INCOMPLETE:
+    "身份已删除，但本地数据清理未完成，请联系支持人员。",
   DATABASE_UNAVAILABLE: "数据库暂时无法连接，请稍后重试。",
   VALIDATION_ERROR: "请检查必填字段、时区和日期范围。",
   DAY_OUTSIDE_TRIP: "这一天不在旅行日期范围内。",
@@ -85,6 +91,11 @@ async function collect<T>(
 }
 export const api = {
   me: (signal?: AbortSignal) => request<User>("/me", { signal }),
+  updateMe: (input: Pick<User, "display_name" | "timezone" | "locale">) =>
+    request<User>("/me", json("PATCH", input)),
+  exportData: () => request<Record<string, unknown>>("/me/export"),
+  deleteAccount: () =>
+    request<void>("/me/delete", json("POST", { confirmation: "DELETE" }), true),
   trips: () =>
     collect((offset) => request<Trip[]>(`/trips?limit=50&offset=${offset}`)),
   trip: (id: string) => request<Trip>(`/trips/${id}`),
@@ -116,6 +127,8 @@ export const api = {
     ),
   createVisit: (input: VisitInput) =>
     request<Visit>("/visits", json("POST", input)),
+  updateVisit: (id: string, input: Partial<VisitInput>) =>
+    request<Visit>(`/visits/${id}`, json("PATCH", input)),
   deleteVisit: (id: string) =>
     request<void>(`/visits/${id}`, { method: "DELETE" }, true),
   days: (id: string) =>
@@ -124,6 +137,10 @@ export const api = {
     ),
   createDay: (id: string, input: { date: string; title?: string }) =>
     request<TripDay>(`/trips/${id}/days`, json("POST", input)),
+  updateDay: (
+    id: string,
+    input: Partial<Pick<TripDay, "date" | "title" | "note" | "sort_order">>,
+  ) => request<TripDay>(`/days/${id}`, json("PATCH", input)),
   deleteDay: (id: string) =>
     request<void>(`/days/${id}`, { method: "DELETE" }, true),
   activities: (id: string) =>
@@ -139,6 +156,23 @@ export const api = {
       type?: string;
     },
   ) => request<Activity>(`/trips/${id}/activities`, json("POST", input)),
+  updateActivity: (
+    id: string,
+    input: Partial<
+      Pick<
+        Activity,
+        | "trip_day_id"
+        | "place_id"
+        | "type"
+        | "title"
+        | "start_at"
+        | "end_at"
+        | "status"
+        | "note"
+        | "sort_order"
+      >
+    >,
+  ) => request<Activity>(`/activities/${id}`, json("PATCH", input)),
   deleteActivity: (id: string) =>
     request<void>(`/activities/${id}`, { method: "DELETE" }, true),
   mapPlaces: (scope: Scope, status: PlaceStatus | "all", offset = 0) =>

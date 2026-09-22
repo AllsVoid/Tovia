@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
+from app.audit import audit_data_event
 from app.errors import DomainError
 from app.models import Place, Trip, User, Visit, WishlistItem
 from app.repositories.explore import CalendarRepository, map_query
@@ -116,6 +117,13 @@ class ExploreService:
             )
         )
         self.session.commit()
+        audit_data_event(
+            "data.entity_deletion",
+            "succeeded",
+            entity="wishlist_item",
+            place_id=str(place_id),
+            user_id=str(self.user.id),
+        )
 
     def calendar_month(self, year: int, month: int) -> CalendarMonth:
         first, last = date(year, month, 1), date(year, month, monthrange(year, month)[1])

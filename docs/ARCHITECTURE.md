@@ -18,6 +18,8 @@ v0.3 阶段 E 增加默认关闭的 Web OIDC 边界。Next.js 使用 Logto 官�
 
 阶段 F 在开关开启时把现有旅行、地点、访问、地图、日历与收藏请求切到同源 BFF。BFF 仅代理显式列入 method/path/query 白名单的既有 API，服务端从 session 取得 access token 后转发到 FastAPI；客户端提供的 Authorization、`x-user-id`，以及 query 或 JSON body 中的 `user_id` 均被拒绝。开关默认关闭，development 模式仍直接使用 `NEXT_PUBLIC_API_URL`。
 
+v0.3 数据维护工作包在 Profile 提供资料编辑和全量 JSON 导出。导出在 API 按认证用户聚合并保留实体 UUID/外键，不包含凭证；导出动作和关键删除动作写入 request-id 结构化审计日志。删除账户先通过 API 内部的 Logto Management API provider 删除外部身份，再在单个 PostgreSQL 事务中清理本地 User 及其旅行数据。该接口仅接受近期签发的 Logto access token；Web 先以 `prompt=login` 重新认证并要求用户输入 `DELETE`。M2M 凭据只配置在 API 环境，不进入 Web。
+
 当前测试与启动方式见 [开发指南](DEVELOPMENT.md)。
 
 ## Phase 2 落地

@@ -34,6 +34,13 @@
 - 不以 email 作为身份主键，也不在本表复制 Logto 用户资料。删除本地 User 时级联删除映射。
 - 本阶段只允许运维命令显式绑定已有 User；未知用户不会被创建，运行时认证仍只使用 development provider。
 
+## v0.3 资料导出与账户删除约定
+
+- JSON 导出版本为 `schema_version: "1.0"`，包含 User、Trip、TripDay、Visit、Activity、被这些记录或 WishlistItem 引用的 Place，以及 WishlistItem；实体 UUID 与关联 UUID 保持不变。导出为只读快照，不含 Logto token 或 M2M secret。
+- 账户删除只允许已绑定的 Logto 身份。用户需重新登录；API 额外要求当前 access token 的 `iat` 不早于 5 分钟。服务端使用单独配置的 M2M 凭据调用 Logto Management API；浏览器不访问该 API。
+- 外部身份删除成功后，Tovia 在一个数据库事务内先解除 Visit 对 Trip/TripDay 的容器引用，再删除 User；用户的 Trip、TripDay、Activity、Visit、WishlistItem 和 UserIdentity 随数据库级联清理，Place 保留为共享规范地点。
+- Management API 失败时不删除本地数据。若身份已删除而本地事务失败，接口返回 `ACCOUNT_DELETION_INCOMPLETE` 并写入审计日志，需要运维介入；应用不得静默降级或泄漏 provider 响应。
+
 ## 1. 核心概念
 
 ### Place

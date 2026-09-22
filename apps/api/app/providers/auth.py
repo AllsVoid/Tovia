@@ -33,6 +33,7 @@ class AuthPrincipal:
     user_id: UUID
     provider: str
     subject: str
+    issued_at: int | None = None
 
 
 class AuthProvider(Protocol):
@@ -119,7 +120,13 @@ class OidcAuthProvider:
                 reason="identity_unlinked",
             )
             raise DomainError("AUTH_REQUIRED", "Identity is not linked", 401)
-        return AuthPrincipal(user_id=identity.user_id, provider=OIDC_PROVIDER, subject=subject)
+        issued_at = claims.get("iat")
+        return AuthPrincipal(
+            user_id=identity.user_id,
+            provider=OIDC_PROVIDER,
+            subject=subject,
+            issued_at=issued_at if isinstance(issued_at, int) else None,
+        )
 
 
 @lru_cache

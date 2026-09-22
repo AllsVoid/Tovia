@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     oidc_audience: str | None = None
     oidc_jwks_url: AnyHttpUrl | None = None
     oidc_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
+    logto_management_token_endpoint: AnyHttpUrl | None = None
+    logto_management_api_url: AnyHttpUrl | None = None
+    logto_management_api_resource: str | None = None
+    logto_management_client_id: str | None = None
+    logto_management_client_secret: str | None = None
     cors_origins: list[str] = ["http://localhost:3000"]
 
     @model_validator(mode="after")
@@ -34,6 +39,19 @@ class Settings(BaseSettings):
                 raise ValueError("Production OIDC audience must not be empty")
             if make_url(self.database_url).password == "tovia_local_only":
                 raise ValueError("Production must replace the sample database password")
+        management_settings = (
+            self.logto_management_token_endpoint,
+            self.logto_management_api_url,
+            self.logto_management_api_resource,
+            self.logto_management_client_id,
+            self.logto_management_client_secret,
+        )
+        if any(management_settings) and not all(management_settings):
+            raise ValueError("Logto account deletion requires complete Management API settings")
+        if self.app_env == "production" and not all(management_settings):
+            raise ValueError(
+                "Production requires Logto Management API settings for account deletion"
+            )
         return self
 
 

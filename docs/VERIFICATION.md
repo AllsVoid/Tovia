@@ -111,3 +111,10 @@
 - 后端：18 项全部通过、无跳过。使用仓库缓存的 PostgreSQL 17 / PostGIS，在 `tmp/regions-pg` 新建隔离集群，仅监听 127.0.0.1:55439；测试库为 `tovia_regions_test`，迁移往返使用另一个可丢弃库 `tovia_regions_migration`，未接触业务库。真实数据库验证行政区搜索、重复选择复用 Place、未保存访问不进入地图、旅行访问关联及 MapPlace.region_id 返回，同时验证现有 CRUD、用户隔离及迁移往返。浏览器流程仍采用 mock API，未宣称浏览器直接连接真实 API 完成端到端测试。
 - Next.js 生产构建、TypeScript、ESLint、Prettier、Python Ruff/mypy 均通过。
 - 无 schema 迁移；现有访问记录保留。国内边界不完整地区不开放新选择；海外当前仅国家粒度。计划到期自动归为曾至仍遵循既有规则。
+
+## v0.3 数据导出与备份恢复补验（2026-09-22）
+
+- 数据导出改用显式 `DataExport` schema，离线命令校验版本、时区时间、重复实体 ID、归属和 Trip、TripDay、Place 外键引用；对应单元测试通过。
+- 在 WSL 的专用 `tovia-v03-restore-check` Compose project 中从新库执行 Alembic 到 `0004_user_identity`，生成 PostgreSQL custom-format 备份并恢复到随机命名数据库；PostGIS 3.5、Alembic revision 和 8 张核心表行数全部一致。临时数据库、容器、网络、卷和测试备份已清理。
+- API 静态检查通过：Ruff format、Ruff lint、MyPy strict。非数据库回归 54 passed、8 skipped；随后显式连接隔离 PostGIS 执行 8 项集成及迁移测试，8 passed。跳过项已由后一次真实数据库运行覆盖，全套共 62 项通过。
+- 真实 Logto M2M 删号、双账户浏览器隔离、HTTPS 反向代理和应用版本回滚仍需目标部署环境验收，v0.3 状态保持“进行中”。
