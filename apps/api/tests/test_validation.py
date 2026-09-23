@@ -126,6 +126,27 @@ def test_oidc_configuration_requires_all_endpoints() -> None:
         Settings(oidc_clock_skew_seconds=301, _env_file=None)
 
 
+def test_compose_empty_optional_auth_settings_are_unset() -> None:
+    settings = Settings(
+        auth_mode="development",
+        oidc_issuer="",
+        oidc_audience=" ",
+        oidc_jwks_url="",
+        logto_management_token_endpoint="",
+        logto_management_api_url=" ",
+        logto_management_api_resource="",
+        logto_management_client_id="",
+        logto_management_client_secret="",
+        _env_file=None,
+    )
+
+    assert settings.oidc_issuer is None
+    assert settings.oidc_audience is None
+    assert settings.oidc_jwks_url is None
+    assert settings.logto_management_token_endpoint is None
+    assert settings.logto_management_api_url is None
+
+
 def test_service_hides_other_users_trip_and_visit() -> None:
     service = TravelService(MagicMock(), User(id=uuid4(), display_name="one"))
     service.repo = MagicMock()

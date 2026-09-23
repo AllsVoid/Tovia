@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiPath, apiPattern } from "./api-route";
+import { apiPath, apiPattern, currentUser } from "./api-route";
 
 test.use({ timezoneId: "Asia/Hong_Kong" });
 
@@ -56,7 +56,8 @@ test("edits a visit and an activity without recreating either record", async ({
     const request = route.request();
     const path = apiPath(request.url());
     let data: unknown;
-    if (path === `/trips/${trip.id}`) data = trip;
+    if (path === "/me") data = currentUser;
+    else if (path === `/trips/${trip.id}`) data = trip;
     else if (path === `/trips/${trip.id}/days`) data = days;
     else if (path === `/trips/${trip.id}/activities`) data = [activity];
     else if (path === "/visits") data = [visit];

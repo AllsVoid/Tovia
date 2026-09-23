@@ -90,7 +90,7 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml up -d
 
 ```dotenv
 NEXT_PUBLIC_WEB_AUTH_MODE=oidc
-LOGTO_ENDPOINT=http://localhost:3001
+LOGTO_ENDPOINT=http://auth.localhost:3001
 LOGTO_BASE_URL=http://localhost:3000
 LOGTO_APP_ID=<traditional-web-app-id>
 LOGTO_APP_SECRET=<traditional-web-app-secret>
@@ -102,7 +102,7 @@ LOGTO_API_RESOURCE=https://api.tovia.local
 
 ```dotenv
 AUTH_MODE=oidc
-OIDC_ISSUER=http://localhost:3001/oidc
+OIDC_ISSUER=http://auth.localhost:3001/oidc
 OIDC_AUDIENCE=https://api.tovia.local
 OIDC_JWKS_URL=http://logto:3001/oidc/jwks
 ```

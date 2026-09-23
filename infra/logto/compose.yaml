@@ -25,7 +25,7 @@ services:
         && npm start
     environment:
       DB_URL: postgresql://${LOGTO_POSTGRES_USER:-logto}:${LOGTO_POSTGRES_PASSWORD:-logto_local_only_change_me}@logto-db:5432/${LOGTO_POSTGRES_DB:-logto}
-      ENDPOINT: ${LOGTO_ENDPOINT:-http://localhost:3001}
+      ENDPOINT: ${LOGTO_ENDPOINT:-http://auth.localhost:3001}
       ADMIN_ENDPOINT: ${LOGTO_ADMIN_ENDPOINT:-http://localhost:3002}
     ports:
       - "${LOGTO_BIND_ADDRESS:-127.0.0.1}:${LOGTO_HOST_PORT:-3001}:3001"
@@ -33,6 +33,10 @@ services:
     depends_on:
       logto-db:
         condition: service_healthy
+    networks:
+      default:
+        aliases:
+          - auth.localhost
     healthcheck:
       test:
         - CMD-SHELL

@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Literal
 from uuid import UUID
 
-from pydantic import AnyHttpUrl, Field, model_validator
+from pydantic import AnyHttpUrl, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     logto_management_client_id: str | None = None
     logto_management_client_secret: str | None = None
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    @field_validator(
+        "oidc_issuer",
+        "oidc_audience",
+        "oidc_jwks_url",
+        "logto_management_token_endpoint",
+        "logto_management_api_url",
+        "logto_management_api_resource",
+        "logto_management_client_id",
+        "logto_management_client_secret",
+        mode="before",
+    )
+    @classmethod
+    def empty_optional_auth_setting(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @model_validator(mode="after")
     def validate_auth(self) -> "Settings":

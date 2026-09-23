@@ -24,7 +24,9 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 等待 `logto` 和 `logto-db` 都显示 healthy，然后访问：
 
 - Logto Console：<http://localhost:3002>
-- Logto OIDC discovery：<http://localhost:3001/oidc/.well-known/openid-configuration>
+- Logto OIDC discovery：<http://auth.localhost:3001/oidc/.well-known/openid-configuration>
+
+本地 OIDC endpoint 使用 `auth.localhost`：浏览器会把 `.localhost` 域名解析到宿主机回环地址；叠加 `compose.tovia-oidc.yaml` 后，API 和 Web 容器会在 Logto 网络内把同一域名解析到 Logto 容器。因此 issuer 在浏览器、Web 服务端和 API 中保持一致，同时端口仍只绑定宿主机 loopback。
 
 首次进入 Console 时创建本地管理员。Compose 的 seed 命令关闭了管理员密码泄露在线检查，避免离线开发环境初始化失败；这不是生产配置。
 
@@ -51,7 +53,7 @@ docker compose --env-file infra/logto/.env -f infra/logto/compose.yaml ps
 ```powershell
 $deviceCodeResponse = Invoke-RestMethod `
   -Method Post `
-  -Uri 'http://localhost:3001/oidc/device/auth' `
+  -Uri 'http://auth.localhost:3001/oidc/device/auth' `
   -ContentType 'application/x-www-form-urlencoded' `
   -Body @{
     client_id = '<device-app-id>'
@@ -67,7 +69,7 @@ $deviceCodeResponse | Format-List user_code, verification_uri, verification_uri_
 ```powershell
 $tokenResponse = Invoke-RestMethod `
   -Method Post `
-  -Uri 'http://localhost:3001/oidc/token' `
+  -Uri 'http://auth.localhost:3001/oidc/token' `
   -ContentType 'application/x-www-form-urlencoded' `
   -Body @{
     client_id = '<device-app-id>'
@@ -83,7 +85,7 @@ $accessToken = $tokenResponse.access_token
 ```powershell
 $tokenResponse = Invoke-RestMethod `
   -Method Post `
-  -Uri 'http://localhost:3001/oidc/token' `
+  -Uri 'http://auth.localhost:3001/oidc/token' `
   -ContentType 'application/x-www-form-urlencoded' `
   -Body @{
     client_id = '<device-app-id>'
@@ -95,7 +97,7 @@ $tokenResponse = Invoke-RestMethod `
 $accessToken = $tokenResponse.access_token
 ```
 
-JWT 的 `aud` 应为 `https://api.tovia.local`，`iss` 应为 `http://localhost:3001/oidc`。不要提交 access token、refresh token 或 `infra/logto/.env`。
+JWT 的 `aud` 应为 `https://api.tovia.local`，`iss` 应为 `http://auth.localhost:3001/oidc`。不要提交 access token、refresh token 或 `infra/logto/.env`。
 
 ## 4. 绑定身份并验证阶段 C
 

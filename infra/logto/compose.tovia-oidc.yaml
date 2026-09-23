@@ -2,10 +2,14 @@ services:
   api:
     environment:
       AUTH_MODE: oidc
-      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:3001/oidc}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://auth.localhost:3001/oidc}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-https://api.tovia.local}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://logto:3001/oidc/jwks}
       OIDC_CLOCK_SKEW_SECONDS: ${OIDC_CLOCK_SKEW_SECONDS:-30}
+    networks:
+      - default
+      - logto-network
+  web:
     networks:
       - default
       - logto-network

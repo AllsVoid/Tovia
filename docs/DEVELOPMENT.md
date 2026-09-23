@@ -157,7 +157,7 @@ Copy-Item apps/web/.env.example apps/web/.env.local
 ```text
 NEXT_PUBLIC_WEB_AUTH_MODE=oidc
 TOVIA_API_URL=http://localhost:8000
-LOGTO_ENDPOINT=http://localhost:3001
+LOGTO_ENDPOINT=http://auth.localhost:3001
 LOGTO_APP_ID=<traditional-web-app-id>
 LOGTO_APP_SECRET=<traditional-web-app-secret>
 LOGTO_BASE_URL=http://localhost:3000
