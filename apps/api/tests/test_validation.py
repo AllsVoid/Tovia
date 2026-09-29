@@ -99,6 +99,7 @@ def test_production_rejects_sample_database_password() -> None:
             oidc_issuer="https://auth.example.com/oidc",
             oidc_audience="https://api.example.com",
             oidc_jwks_url="http://logto:3001/oidc/jwks",
+            database_url="postgresql+psycopg://tovia:tovia_local_only@db:5432/tovia",
             _env_file=None,
         )
 
