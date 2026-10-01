@@ -1,5 +1,10 @@
 import type {
   Activity,
+  Booking,
+  BookingInput,
+  Expense,
+  ExpenseInput,
+  TripSummary,
   CalendarDay,
   CalendarMonth,
   MapDetail,
@@ -28,6 +33,12 @@ export const apiUrl =
   process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export const apiBaseUrl = webOidcEnabled ? "/api/bff" : `${apiUrl}/api/v1`;
 const messages: Record<string, string> = {
+  VERSION_CONFLICT:
+    "记录已被更新。请保留当前输入，取消编辑并重新打开最新记录后再保存。",
+  ACTIVITY_TRIP_MISMATCH: "关联活动不属于所选旅行。",
+  ACTIVITY_DAY_MISMATCH: "关联活动不属于所选旅行日。",
+  BOOKING_NOT_FOUND: "预订不存在或已删除。",
+  EXPENSE_NOT_FOUND: "费用不存在或已删除。",
   AUTH_REQUIRED: "请启用本地开发认证，或配置登录服务。",
   RECENT_AUTH_REQUIRED: "请重新登录后再删除账户。",
   ACCOUNT_DELETION_UNAVAILABLE: "账户删除服务尚未配置，请联系管理员。",
@@ -90,6 +101,39 @@ async function collect<T>(
   return rows;
 }
 export const api = {
+  bookings: (tripId?: string, offset = 0) =>
+    request<Booking[]>(
+      `${tripId ? `/trips/${tripId}/bookings` : "/bookings"}?limit=50&offset=${offset}`,
+    ),
+  createBooking: (input: BookingInput) =>
+    request<Booking>("/bookings", json("POST", input)),
+  updateBooking: (
+    id: string,
+    input: Partial<BookingInput> & { version: number },
+  ) => request<Booking>(`/bookings/${id}`, json("PATCH", input)),
+  deleteBooking: (id: string, version: number) =>
+    request<void>(
+      `/bookings/${id}?version=${version}`,
+      { method: "DELETE" },
+      true,
+    ),
+  expenses: (tripId?: string, offset = 0) =>
+    request<Expense[]>(
+      `${tripId ? `/trips/${tripId}/expenses` : "/expenses"}?limit=50&offset=${offset}`,
+    ),
+  createExpense: (input: ExpenseInput) =>
+    request<Expense>("/expenses", json("POST", input)),
+  updateExpense: (
+    id: string,
+    input: Partial<ExpenseInput> & { version: number },
+  ) => request<Expense>(`/expenses/${id}`, json("PATCH", input)),
+  deleteExpense: (id: string, version: number) =>
+    request<void>(
+      `/expenses/${id}?version=${version}`,
+      { method: "DELETE" },
+      true,
+    ),
+  tripSummary: (id: string) => request<TripSummary>(`/trips/${id}/summary`),
   me: (signal?: AbortSignal) => request<User>("/me", { signal }),
   updateMe: (input: Pick<User, "display_name" | "timezone" | "locale">) =>
     request<User>("/me", json("PATCH", input)),

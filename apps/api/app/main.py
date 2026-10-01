@@ -16,7 +16,7 @@ from app.audit import reset_request_id, set_request_id
 from app.config import get_settings
 from app.db import engine
 from app.errors import DomainError
-from app.routers import core, explore, health
+from app.routers import core, explore, finance, health
 from app.schemas.common import Envelope, ErrorDetail
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(core.router)
 app.include_router(explore.router)
+app.include_router(finance.router)
 
 
 @app.middleware("http")

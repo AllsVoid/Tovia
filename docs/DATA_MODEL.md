@@ -41,6 +41,18 @@
 - 外部身份删除成功后，Tovia 在一个数据库事务内先解除 Visit 对 Trip/TripDay 的容器引用，再删除 User；用户的 Trip、TripDay、Activity、Visit、WishlistItem 和 UserIdentity 随数据库级联清理，Place 保留为共享规范地点。
 - Management API 失败时不删除本地数据。若身份已删除而本地事务失败，接口返回 `ACCOUNT_DELETION_INCOMPLETE` 并写入审计日志，需要运维介入；应用不得静默降级或泄漏 provider 响应。
 
+## v0.4 Booking / Expense 实现约定
+
+- `0005_finance` 添加 bookings / expenses；UUID 主键、user_id、可空 trip_id / activity_id、created_at / updated_at（TIMESTAMPTZ）以及从 1 开始的 version。Activity 新增 `(id, trip_id)` 唯一约束，支持关联的复合外键。
+- Booking：type=FLIGHT/TRAIN/BUS/HOTEL/TICKET/RESTAURANT/OTHER；status=PLANNED/CONFIRMED/COMPLETED/CANCELLED（默认 CONFIRMED）；title、provider_name、reference_no、必填 start_at、可空 end_at、开始 timezone 与 end_timezone、可空 origin_place_id / destination_place_id、address、amount / currency、note。结束时间不早于开始时间。金额和币种一起填写或一起留空。
+- Expense：可空 trip_day_id / place_id / merchant，category（默认 OTHER，可自定义 64 字符）、original_amount / original_currency、可空 settled_amount / settled_currency / exchange_rate / payment_method、必填 occurred_at、timezone、note。结算金额/币种成对；汇率必须为正且需有结算数据，含义为“结算币单位 / 原币单位”，只保存用户提供值，不自动计算或纠正实际账单。
+- 金额为 Numeric(18,4)，范围 `[0, 10^14)`；汇率 Numeric(18,8)，范围 `(0,10^10)`。输入接受十进制字符串或整数，拒绝浮点、NaN/Infinity、负数、超范围或超精度值；JSON 输出金额字符串。币种按 schema 中支持的大写 ISO 4217 代码校验，不自动舍入。
+- TripSummary 的 booking_count 包含所有预订状态。original_totals 按原币种汇总所有费用；paid_totals 和 categories 对每笔费用优先用 settled_amount/settled_currency，否则用 original_amount/original_currency。同币种直接 Decimal 加法；跨币种分别展示，不提供虚构统一总额。零结算值有效，不能回退到原币。Booking.amount 不计入任何费用合计。
+- Booking/Expense 可独立于 Trip。activity_id 或 Expense.trip_day_id 有值时必须有 Trip；数据库约束 Trip 属于相同 user、Activity 和 TripDay 属于同一 Trip。Activity 与账目所属旅行日是独立链接，活动移动日期不改写费用实际时间/旅行日。
+- 删除 Trip：保留用户账目，清空 trip_id / activity_id 及 Expense.trip_day_id，递增 version。删除 TripDay：清空费用 trip_day_id，同时解除随之删除的 Activity 链接；删除 Activity：只清空账目的 activity_id。相关用户/Place/时间/金额均保留。Place 外键 RESTRICT。删除 User 时先解除容器链接，再随用户级联删除全部账目。
+- 新增/更改预订与费用不创建 Visit、Activity 或改变 Trip 状态；不把预订价格自动生成消费。Document/raw_data/source_document_id 等文件及 AI 字段推迟到对应版本，避免无外键的来源引用。
+- 新导出 `schema_version: "1.1"` 包含 bookings、expenses 以及其引用的 Place；校验器检查金额、重复 ID、所有权和所有关联，继续接受不含账目的 1.0 文件。
+
 ## 1. 核心概念
 
 ### Place

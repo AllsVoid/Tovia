@@ -17,6 +17,28 @@ type Rule = {
 
 const pageQuery = new Set(["limit", "offset"]);
 const rules: Rule[] = [
+  {
+    method: "GET",
+    path: /^(bookings|expenses)$/,
+    query: new Set(["trip_id", "limit", "offset"]),
+  },
+  { method: "POST", path: /^(bookings|expenses)$/ },
+  { method: "GET", path: /^(bookings|expenses)\/[a-zA-Z0-9_-]+$/ },
+  { method: "PATCH", path: /^(bookings|expenses)\/[a-zA-Z0-9_-]+$/ },
+  {
+    method: "DELETE",
+    path: /^(bookings|expenses)\/[a-zA-Z0-9_-]+$/,
+    query: new Set(["version"]),
+  },
+  {
+    method: "GET",
+    path: /^trips\/[a-zA-Z0-9_-]+\/(bookings|expenses)$/,
+    query: pageQuery,
+  },
+  {
+    method: "GET",
+    path: /^trips\/[a-zA-Z0-9_-]+\/(summary|expenses\/summary)$/,
+  },
   { method: "GET", path: /^me$/ },
   { method: "PATCH", path: /^me$/ },
   { method: "GET", path: /^me\/export$/ },

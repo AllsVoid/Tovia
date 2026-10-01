@@ -11,6 +11,64 @@ export interface User {
   created_at: string;
   updated_at: string;
 }
+export type BookingType =
+  "FLIGHT" | "TRAIN" | "BUS" | "HOTEL" | "TICKET" | "RESTAURANT" | "OTHER";
+export type BookingStatus = "PLANNED" | "CONFIRMED" | "COMPLETED" | "CANCELLED";
+export interface BookingInput {
+  trip_id: string | null;
+  activity_id: string | null;
+  type: BookingType;
+  status: BookingStatus;
+  title: string;
+  provider_name: string | null;
+  reference_no: string | null;
+  start_at: string;
+  end_at: string | null;
+  timezone: string;
+  end_timezone: string;
+  origin_place_id: string | null;
+  destination_place_id: string | null;
+  address: string | null;
+  amount: string | null;
+  currency: string | null;
+  note: string | null;
+}
+export interface Booking extends BookingInput {
+  id: string;
+  version: number;
+}
+export interface ExpenseInput {
+  trip_id: string | null;
+  trip_day_id: string | null;
+  activity_id: string | null;
+  place_id: string | null;
+  merchant: string | null;
+  category: string;
+  original_amount: string;
+  original_currency: string;
+  settled_amount: string | null;
+  settled_currency: string | null;
+  exchange_rate: string | null;
+  payment_method: string | null;
+  occurred_at: string;
+  timezone: string;
+  note: string | null;
+}
+export interface Expense extends ExpenseInput {
+  id: string;
+  version: number;
+}
+export interface MoneyTotal {
+  currency: string;
+  amount: string;
+}
+export interface TripSummary {
+  booking_count: number;
+  expense_count: number;
+  original_totals: MoneyTotal[];
+  paid_totals: MoneyTotal[];
+  categories: (MoneyTotal & { category: string })[];
+}
 export interface Trip {
   id: string;
   title: string;

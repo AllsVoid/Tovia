@@ -36,7 +36,9 @@ def main() -> int:
         f"visits={len(records.visits)} "
         f"activities={len(records.activities)} "
         f"places={len(records.places)} "
-        f"wishlist_items={len(records.wishlist_items)}"
+        f"wishlist_items={len(records.wishlist_items)} "
+        f"bookings={len(records.bookings)} "
+        f"expenses={len(records.expenses)}"
     )
     return 0
 

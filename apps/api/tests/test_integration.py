@@ -100,7 +100,7 @@ def test_profile_export_includes_linked_records_and_is_audited(
             response = client.get("/api/v1/me/export")
         assert response.status_code == 200
         exported = response.json()["data"]
-        assert exported["schema_version"] == "1.0"
+        assert exported["schema_version"] == "1.1"
         records = exported["data"]
         assert records["user"]["id"] == str(user.id)
         assert records["trips"][0]["id"] == str(trip.id)

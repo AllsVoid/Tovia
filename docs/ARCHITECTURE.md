@@ -24,6 +24,14 @@ v0.3 数据维护工作包在 Profile 提供资料编辑和全量 JSON 导出。
 
 ## Phase 2 落地
 
+### v0.4 账目模块
+
+新增 `models/finance.py`、`schemas/finance.py`、`repositories/finance.py`、`services/finance.py` 和 `routers/finance.py`。FinanceService 复用 TravelService 的所有权及关联校验；route handler 仅验证参数、调用服务及返回 envelope。金额使用 PostgreSQL Numeric 和 Python Decimal，JSON 收发以十进制字符串表达，拒绝浮点金额。汇总按已存字段精确分组，不依赖外部汇率服务。
+
+新增 `0005_finance` 迁移；数据库复合外键校验 Trip 所有权、Activity/TripDay 所属旅行。PATCH/DELETE 在用户过滤后获取行锁，再检查 version；成功编辑递增版本，冲突返回 409。容器删除在同一事务内解除关联并递增受影响账目的版本，随后删除容器。删除 User 清理其账目，规范 Place 保留。
+
+Web 使用独立 TripFinance 组件，旅行详情按需打开账目；`/trips/records` 分页展示全部及独立记录。金额保持字符串并直接展示 API 汇总，不进行 JavaScript 浮点计算。OIDC 模式继续走同源 BFF，新增精确路由/查询白名单。写入后失效账目列表与旅行汇总缓存。新增数据纳入 Profile 1.1 导出，校验器兼容 1.0 导出。
+
 2026-09-19 行政区改版：`providers/regions.py` 读取构建时生成的离线目录，`RegionService` 将明确选择的行政区幂等解析为 Place。路由提供搜索与解析接口，不自行构造实体。目录同时打包到 API 与 Web，边界按省拆分为静态 GeoJSON，MapLibre 按所需行政区加载面并填色。新增选择不依赖在线地理编码。详见 `apps/web/public/maps/regions/README.md` 和 `infra/scripts/build-regions.py`。
 
 原始 AreaCity GCJ-02 数据在构建时转换为 WGS84。世界地图沿用 Natural Earth，海外选择暂按国家粒度。旧 POI 的国内坐标在前端匹配市级面，只改变展示，不重写原数据。未匹配的旧地点保留列表提示。区域边界加载失败有独立重试入口。目录/几何为版本化静态派生资产，不作为每次访问记录存储。

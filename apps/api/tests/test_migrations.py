@@ -19,6 +19,16 @@ def test_offline_migration_upgrade_and_downgrade() -> None:
     assert "CREATE TABLE user_identities" in sql
     assert "uq_user_identities_provider_subject" in sql
     assert "ix_user_identities_user_id" in sql
+    assert "CREATE TABLE bookings" in sql
+    assert "CREATE TABLE expenses" in sql
+    assert "fk_bookings_activity_trip" in sql
+    assert "fk_expenses_day_trip" in sql
+    output.seek(0)
+    output.truncate()
+    command.downgrade(config, "0005_finance:0004_user_identity", sql=True)
+    assert "DROP TABLE expenses" in output.getvalue()
+    assert "DROP TABLE bookings" in output.getvalue()
+    assert "DROP CONSTRAINT uq_activities_id" in output.getvalue()
     output.seek(0)
     output.truncate()
     command.downgrade(config, "0003_wishlist:base", sql=True)

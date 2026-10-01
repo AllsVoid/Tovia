@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.schemas.common import Health
 
-SCHEMA_HEAD = "0004_user_identity"
+SCHEMA_HEAD = "0005_finance"
 
 
 def check_health(session: Session) -> Health:

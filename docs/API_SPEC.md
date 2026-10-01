@@ -17,7 +17,30 @@
 - PATCH 仅更改已提交字段，对合并后的完整实体再次验证；不可空字段显式 null 会报错。DELETE 返回 200 和空 data 的 envelope。
 - 错误统一包含 `data: null`、`meta: {}`、`error: {code,message}`。包括 VALIDATION_ERROR (422)、DATA_CONFLICT (409)、AUTH_REQUIRED (401)、DATABASE_UNAVAILABLE (503) 及实体 NOT_FOUND (404)。不暴露 SQL / 连接凭证。
 - 所有核心路由需要认证上下文。当前仅显式 development 模式使用固定本地用户，不接受客户端 user_id；production 禁止开发认证。共享 Place 可读取和创建；私有 Trip / Day / Visit / Activity 按用户隔离。
-- Visit、Activity 手工创建仅接受 MANUAL source。暂未实现 AI、上传、预订和费用。
+- Visit、Activity 手工创建仅接受 MANUAL source。AI 与上传尚未实现；手工预订和费用见 v0.4 当前实现。
+
+## v0.4 当前实现
+
+下列路径均在 `/api/v1` 下，须认证；不允许请求体包含 user_id。
+
+| 路由 | 契约 |
+| --- | --- |
+| GET /bookings、GET /expenses | 当前用户账目；可选 trip_id；包含独立记录 |
+| GET /trips/{trip_id}/bookings、GET /trips/{trip_id}/expenses | 旅行账目；先验证旅行所有权 |
+| POST /bookings、POST /expenses | 201；输入字段见 DATA_MODEL 与 OpenAPI；返回完整记录 |
+| GET /bookings/{id}、GET /expenses/{id} | 返回当前用户记录；不存在/他人记录为 404 |
+| PATCH /bookings/{id}、PATCH /expenses/{id} | 必填 version；合并仅已提供字段并重验完整实体；成功 version+1 |
+| DELETE /bookings/{id}?version=N、DELETE /expenses/{id}?version=N | 必填正整数 version；删除匹配版本；返回 data=null |
+| GET /trips/{trip_id}/summary | booking_count、expense_count、original_totals、paid_totals、categories |
+| GET /trips/{trip_id}/expenses/summary | 同上，兼容原规划的汇总路径 |
+
+列表 limit=1..100（默认 50）、offset>=0（默认 0），meta 包含 limit/offset/total；按开始/消费时间倒序、UUID 稳定排序。summary 汇总全部账目，不受当前列表分页影响。
+
+所有金额与汇率应发送字符串，例如 `"original_amount":"0.10"`；输出为 Decimal 字符串。汇总 MoneyTotal={currency,amount}，CategoryTotal={category,currency,amount}。采用用户实际结算金额，否则按原币汇总，规则见 DATA_MODEL；不重复计入预订价格。
+
+版本不匹配返回 VERSION_CONFLICT 409；必填/币种/时间/金额错误为 VALIDATION_ERROR 422；关联到其他用户 Trip/Activity/Day 为对应 NOT_FOUND 404；同用户跨旅行关联为 ACTIVITY_TRIP_MISMATCH 或 DAY_TRIP_MISMATCH 422。不存在的共享 Place 返回 PLACE_NOT_FOUND 404。无提交版本不允许 PATCH/DELETE。并发编辑通过行锁和版本校验，只允许一个相同旧版本提交成功。
+
+Profile 导出现在返回 1.1 格式，新增 bookings/expenses 和其全部引用地点；校验工具兼容旧 1.0。账户删除同时清理预订与费用。OIDC Web 的新增路径经 BFF 白名单转发，DELETE 只额外允许 version 查询字段，身份仍来自服务端 session。
 
 ## Phase 2 当前实现
 

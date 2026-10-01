@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from geoalchemy2 import Geometry
 from geoalchemy2.elements import WKTElement
 from pydantic import BaseModel
-from sqlalchemy import cast, func, select, update
+from sqlalchemy import Select, cast, func, select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -13,6 +13,7 @@ from app.audit import audit_data_event
 from app.config import get_settings
 from app.errors import DomainError
 from app.models import Activity, Base, Place, Trip, TripDay, User, UserIdentity, Visit, WishlistItem
+from app.models.finance import Booking, Expense
 from app.providers.auth import AuthPrincipal
 from app.providers.logto_management import delete_logto_user
 from app.repositories.core import Repository
@@ -31,6 +32,7 @@ from app.schemas.core import (
     VisitRead,
 )
 from app.schemas.data_export import DataExport, ExportRecords, WishlistItemExport
+from app.schemas.finance import BookingRead, ExpenseRead
 
 S = TypeVar("S", bound=BaseModel)
 
@@ -101,6 +103,7 @@ class TravelService:
         self.session.execute(
             update(Visit).where(Visit.trip_id == trip_id).values(trip_id=None, trip_day_id=None)
         )
+        self.detach_finance_trip(trip_id)
         self.repo.delete(trip)
         audit_data_event(
             "data.entity_deletion",
@@ -131,6 +134,13 @@ class TravelService:
         day = self.day(day_id)
         self.session.execute(
             update(Visit).where(Visit.trip_day_id == day_id).values(trip_day_id=None)
+        )
+        activity_ids = select(Activity.id).where(Activity.trip_day_id == day_id)
+        self.detach_finance_activities(activity_ids)
+        self.session.execute(
+            update(Expense)
+            .where(Expense.trip_day_id == day_id)
+            .values(trip_day_id=None, version=Expense.version + 1)
         )
         self.repo.delete(day)
         audit_data_event(
@@ -242,6 +252,19 @@ class TravelService:
             activity.place_id for activity in activities if activity.place_id is not None
         )
         place_ids.update(item.place_id for item in wishlist)
+        bookings = self.session.scalars(
+            select(Booking).where(Booking.user_id == self.user.id).order_by(Booking.id)
+        ).all()
+        expenses = self.session.scalars(
+            select(Expense).where(Expense.user_id == self.user.id).order_by(Expense.id)
+        ).all()
+        for booking in bookings:
+            place_ids.update(
+                place_id
+                for place_id in (booking.origin_place_id, booking.destination_place_id)
+                if place_id is not None
+            )
+        place_ids.update(expense.place_id for expense in expenses if expense.place_id is not None)
         places = (
             self.session.scalars(
                 select(Place).where(Place.id.in_(place_ids)).order_by(Place.id)
@@ -250,7 +273,7 @@ class TravelService:
             else []
         )
         exported = DataExport(
-            schema_version="1.0",
+            schema_version="1.1",
             exported_at=datetime.now(UTC),
             data=ExportRecords(
                 user=UserRead.model_validate(self.user),
@@ -260,6 +283,8 @@ class TravelService:
                 activities=[ActivityRead.model_validate(activity) for activity in activities],
                 places=[self.place_read(place) for place in places],
                 wishlist_items=[WishlistItemExport.model_validate(item) for item in wishlist],
+                bookings=[BookingRead.model_validate(item) for item in bookings],
+                expenses=[ExpenseRead.model_validate(item) for item in expenses],
             ),
         )
         audit_data_event(
@@ -272,6 +297,8 @@ class TravelService:
             activities=len(activities),
             places=len(places),
             wishlist_items=len(wishlist),
+            bookings=len(bookings),
+            expenses=len(expenses),
         )
         return exported
 
@@ -288,6 +315,7 @@ class TravelService:
 
     def delete_activity(self, activity_id: UUID) -> None:
         activity = self.activity(activity_id)
+        self.detach_finance_activities(select(Activity.id).where(Activity.id == activity_id))
         self.repo.delete(activity)
         audit_data_event(
             "data.entity_deletion",
@@ -333,6 +361,16 @@ class TravelService:
                 .where(Visit.user_id == self.user.id)
                 .values(trip_id=None, trip_day_id=None)
             )
+            self.session.execute(
+                update(Booking)
+                .where(Booking.user_id == self.user.id)
+                .values(trip_id=None, activity_id=None)
+            )
+            self.session.execute(
+                update(Expense)
+                .where(Expense.user_id == self.user.id)
+                .values(trip_id=None, trip_day_id=None, activity_id=None)
+            )
             self.session.delete(self.user)
             self.session.commit()
         except SQLAlchemyError as exc:
@@ -359,3 +397,23 @@ class TravelService:
         for name, value in values.items():
             setattr(entity, name, value)
         return self.repo.save(entity)
+
+    def detach_finance_trip(self, trip_id: UUID) -> None:
+        self.session.execute(
+            update(Booking)
+            .where(Booking.trip_id == trip_id)
+            .values(trip_id=None, activity_id=None, version=Booking.version + 1)
+        )
+        self.session.execute(
+            update(Expense)
+            .where(Expense.trip_id == trip_id)
+            .values(trip_id=None, trip_day_id=None, activity_id=None, version=Expense.version + 1)
+        )
+
+    def detach_finance_activities(self, activity_ids: Select[tuple[UUID]]) -> None:
+        for model in (Booking, Expense):
+            self.session.execute(
+                update(model)
+                .where(model.activity_id.in_(activity_ids))
+                .values(activity_id=None, version=model.version + 1)
+            )

@@ -12,7 +12,7 @@ from app.errors import DomainError
 from app.main import app
 from app.models import User
 from app.providers.auth import AuthPrincipal, DevelopmentAuthProvider, resolve_user
-from app.routers import core, explore
+from app.routers import core, explore, finance
 from app.routers.deps import current_user
 
 
@@ -27,7 +27,7 @@ def dependency_calls(route: APIRoute) -> Iterator[object]:
 def test_every_business_route_requires_current_user() -> None:
     business_routes = [
         route
-        for route in [*core.router.routes, *explore.router.routes]
+        for route in [*core.router.routes, *explore.router.routes, *finance.router.routes]
         if isinstance(route, APIRoute) and route.path.startswith("/api/v1")
     ]
     assert business_routes
@@ -45,6 +45,8 @@ def test_every_business_route_requires_current_user() -> None:
         ("GET", "/api/v1/regions/search?q=南京"),
         ("GET", "/api/v1/map/summary"),
         ("GET", "/api/v1/calendar/month?year=2026&month=9"),
+        ("GET", "/api/v1/bookings"),
+        ("GET", "/api/v1/expenses"),
     ],
 )
 def test_disabled_auth_returns_standard_401(

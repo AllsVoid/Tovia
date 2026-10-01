@@ -46,6 +46,9 @@ export default function Trips() {
           新建旅行
         </Button>
       </div>
+      <Link className="text-link" href="/trips/records">
+        全部预订与费用（含独立记录） →
+      </Link>
       {tripFormOpen && (
         <form
           className="space-y-5 rounded-xl border border-border bg-white p-6"

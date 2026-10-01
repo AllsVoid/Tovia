@@ -9,10 +9,13 @@ from app.models.core import (
     Visit,
     WishlistItem,
 )
+from app.models.finance import Booking, Expense
 
 __all__ = [
     "Activity",
     "Base",
+    "Booking",
+    "Expense",
     "Place",
     "Trip",
     "TripDay",

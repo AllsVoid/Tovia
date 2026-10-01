@@ -23,6 +23,7 @@ import { refreshTravel } from "@/lib/queries";
 import { Button } from "./ui/button";
 import { QueryError } from "./query-error";
 import { RecordPlace } from "./record-place";
+import { TripFinance } from "./trip-finance";
 
 function VisitRow({ visit, onDelete }: { visit: Visit; onDelete: () => void }) {
   const client = useQueryClient();
@@ -446,6 +447,7 @@ export function TripDetail({
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [editingDayId, setEditingDayId] = useState<string | null>(null);
+  const [financeOpen, setFinanceOpen] = useState(false);
   const [editingActivityId, setEditingActivityId] = useState<string | null>(
     null,
   );
@@ -527,6 +529,14 @@ export function TripDetail({
         </div>
       </header>
       {editing && <EditTrip trip={t} onDone={() => setEditing(false)} />}
+      <Button
+        variant="outline"
+        aria-expanded={financeOpen}
+        onClick={() => setFinanceOpen(!financeOpen)}
+      >
+        {financeOpen ? "收起预订与费用" : "管理预订与费用"}
+      </Button>
+      {financeOpen && <TripFinance trip={t} />}
       {action.error && (
         <p role="alert" className="error-message">
           {action.error.message}
@@ -826,7 +836,7 @@ export function TripDetail({
           onClick={() => {
             if (
               window.confirm(
-                "删除旅行与每日安排？地点及访问记录会保留在地图和日历中。",
+                "删除旅行与每日安排？地点及访问记录会保留；预订和费用会解除旅行、旅行日及活动关联，可在全部预订与费用中继续管理。",
               )
             )
               action.mutate(async () => {

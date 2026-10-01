@@ -204,6 +204,7 @@ class Visit(Entity, Created, Base):
 class Activity(Entity, Created, Updated, Base):
     __tablename__ = "activities"
     __table_args__ = (
+        UniqueConstraint("id", "trip_id"),
         ForeignKeyConstraint(
             ["trip_day_id", "trip_id"],
             ["trip_days.id", "trip_days.trip_id"],

@@ -118,4 +118,5 @@ $RECYCLE.BIN/
 # Commit dependency lockfiles, Alembic migrations, fixtures, shared tool settings,
 # project documentation, and project agent instructions; do not add blanket
 # ignores for these files.
-docs/
+docs/*
+!docs/VERSION_0_4.md

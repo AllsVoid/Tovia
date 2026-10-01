@@ -2,6 +2,14 @@
 
 ## 升级到地图与日历
 
+### v0.4 升级与体验
+
+当前 head 为 `0005_finance`。在 `apps/api` 运行 `uv run alembic upgrade head`，已有 0.3 的 User/Trip/Place/Visit UUID 和数据保留。新增两张账目表、Activity 关联唯一约束，不改写现有旅行事实。`alembic downgrade 0004_user_identity` 会删除全部预订和费用，仅可在可丢弃测试库执行；真实环境回滚应用前需备份账目。
+
+Web：旅行档案 → 打开旅行 → 管理预订与费用 → 录入往返交通、住宿 → 切换费用 → 添加消费及可选结算金额 → 查看按币种/类别汇总。旅行档案 → 全部预订与费用 可录入独立账目、查看删除旅行后保留的记录，并重新关联。时间输入为设备时区，记录展示按存储的 IANA 时区。价格/金额全程十进制字符串。
+
+测试：`tests/test_finance.py` 校验金额/时间/结算边界及精确汇总；`test_finance_integration.py` 覆盖 PostGIS CRUD、分页、跨用户保护、关联删除、导出与真实并发会话冲突；`apps/web/tests/finance.spec.ts` 覆盖预订/费用完整流程、旧版本提示和窄屏重试。具体验证结果见 [VERSION_0_4.md](VERSION_0_4.md)。0.3 未完成的真实环境审查不在此次开发范围内。
+
 已有数据库请在 `apps/api` 下运行迁移：
 
 ```powershell
@@ -9,7 +17,7 @@ Set-Location apps/api
 uv run alembic upgrade head
 ```
 
-新增 head 为 `0004_user_identity`。使用 Docker 时，在根目录运行 `docker compose up --build -d`，migrate 服务会执行升级。
+当前 head 为 `0005_finance`。使用 Docker 时，在根目录运行 `docker compose up --build -d`，migrate 服务会执行升级。
 
 体验路径：新建旅行 → 下一步在地点与足迹中自动展开添加城市 → 搜索城市或区县（区县归并到所属城市）→ 确认抵达时间 → 加入旅行 → 继续添加城市或查看地图高亮 → 新建旅行日并在当天卡片内添加活动。地图也支持独立访问及未至收藏，无需填写经纬度。未来抵达归入将至。输入时间使用本机时区，界面会提示；地点时区影响日历归日。
 
@@ -36,7 +44,7 @@ docker compose ps -a
 
 `migrate` 退出码为 0 属于正常状态。`/health` 在数据库不可用、PostGIS 不可用或迁移不是最新版本时返回 503，不会在应用启动时自动建表。
 
-Compose 使用本机 loopback 端口；默认密码和开发认证仅用于本地。复制 `.env.example` 后按需调整。生产环境必须关闭开发认证；当前没有生产登录实现。
+Compose 使用本机 loopback 端口；默认密码和开发认证仅用于本地。复制 `.env.example` 后按需调整。生产环境必须启用 OIDC，配置见下文登录与服务器部署章节。
 
 ## 本地热更新
 
@@ -105,6 +113,7 @@ uv run alembic check
 2. `0002_core`：User、Trip、TripDay、Place、Visit、Activity 及约束和索引。
 3. `0003_wishlist`：独立愿望清单及用户/地点约束。
 4. `0004_user_identity`：外部 provider subject 到本地 User UUID 的稳定映射。
+5. `0005_finance`：预订、费用、精确金额、容器关联约束与并发版本。
 
 `alembic downgrade 0001_postgis` 会删除核心表和全部旅行数据，仅应在可丢弃数据库上执行。继续降到 base 不删除 PostGIS extension，因为它可能被其他 schema 使用。升级脚本固定保存建表定义，不导入运行时 ORM 模型。
 
@@ -235,7 +244,7 @@ API production 配置拒绝 `AUTH_MODE=disabled`、`development`、示例数据�
 7. 查看 Trips、Days、Activities、Visits 列表；同一 Place 可以关联多次 Visit。
 8. 删除 Trip 后，Visit 保留，trip_id / trip_day_id 清空；独立 Place 保留。
 
-Web 目前提供导航、空状态、旅行列表和创建旅行表单。其他核心数据通过 API 操作。地图、日历与收件箱页面仅是占位。
+Web 已提供地图、日历、旅行创建与详情、资料维护，以及手工预订和费用管理。收件箱尚未实现，暂不显示入口。
 
 ## 检查
 

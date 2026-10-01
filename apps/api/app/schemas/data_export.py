@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Literal, Protocol, Self
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel, ConfigDict, model_validator
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.core import (
     ActivityRead,
@@ -12,6 +12,7 @@ from app.schemas.core import (
     UserRead,
     VisitRead,
 )
+from app.schemas.finance import BookingRead, ExpenseRead
 
 
 class WishlistItemExport(BaseModel):
@@ -35,6 +36,8 @@ class ExportRecords(BaseModel):
     activities: list[ActivityRead]
     places: list[PlaceRead]
     wishlist_items: list[WishlistItemExport]
+    bookings: list[BookingRead] = Field(default_factory=list)
+    expenses: list[ExpenseRead] = Field(default_factory=list)
 
 
 class EntityWithId(Protocol):
@@ -51,7 +54,7 @@ def _ids(rows: Sequence[EntityWithId]) -> set[UUID]:
 class DataExport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.0", "1.1"]
     exported_at: AwareDatetime
     data: ExportRecords
 
@@ -64,6 +67,14 @@ class DataExport(BaseModel):
         _ids(records.activities)
         place_ids = _ids(records.places)
         _ids(records.wishlist_items)
+        _ids(records.bookings)
+        _ids(records.expenses)
+        if self.schema_version == "1.0" and (records.bookings or records.expenses):
+            raise ValueError("Booking and Expense require schema_version 1.1")
+        if self.schema_version == "1.1" and not {"bookings", "expenses"}.issubset(
+            records.model_fields_set
+        ):
+            raise ValueError("Version 1.1 requires bookings and expenses")
 
         trip_days = {day.id: day for day in records.trip_days}
         owner_id = records.user.id
@@ -110,6 +121,30 @@ class DataExport(BaseModel):
                 raise ValueError(f"WishlistItem {item.id} is not owned by the exported user")
             if item.place_id not in place_ids:
                 raise ValueError(f"WishlistItem {item.id} references a missing Place")
+
+        activity_trips = {activity.id: activity.trip_id for activity in records.activities}
+        financial_records: list[BookingRead | ExpenseRead] = [*records.bookings, *records.expenses]
+        for entity in financial_records:
+            if entity.user_id != owner_id:
+                raise ValueError("Financial record is not owned by the exported user")
+            if entity.trip_id is not None and entity.trip_id not in trip_ids:
+                raise ValueError("Financial record references a missing Trip")
+            if entity.activity_id is not None and (
+                entity.activity_id not in activity_trips
+                or activity_trips[entity.activity_id] != entity.trip_id
+            ):
+                raise ValueError("Financial record has inconsistent Activity reference")
+        for booking in records.bookings:
+            for place_id in (booking.origin_place_id, booking.destination_place_id):
+                if place_id is not None and place_id not in place_ids:
+                    raise ValueError("Booking references a missing Place")
+        for expense in records.expenses:
+            if expense.place_id is not None and expense.place_id not in place_ids:
+                raise ValueError("Expense references a missing Place")
+            if expense.trip_day_id is not None:
+                expense_day = trip_days.get(expense.trip_day_id)
+                if expense_day is None or expense_day.trip_id != expense.trip_id:
+                    raise ValueError("Expense has inconsistent TripDay reference")
 
         return self
 
